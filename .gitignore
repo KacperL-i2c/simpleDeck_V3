@@ -1,0 +1,50 @@
+# Build artefacts
+firmware/build/
+desktop/build/
+desktop/dist/
+desktop/.venv/
+desktop/.venv-build/
+installer/windows/output/
+installer/windows/dist/
+installer/windows/build/
+installer/windows/simple_deck_heat.wxs
+installer/windows/simple_deck_heat_v4.wxs
+installer/windows/simple_deck_v4.wxs
+installer/windows/*.wixobj
+installer/windows/*.wixpdb
+installer/windows/output/*.msi
+installer/linux/*.deb
+installer/linux/*.AppImage
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.eggs/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Firmware objekty
+*.o
+*.elf
+*.bin
+*.hex
+*.lst
+*.map
+
+# Secrets
+.env
+*.key
+*.pem

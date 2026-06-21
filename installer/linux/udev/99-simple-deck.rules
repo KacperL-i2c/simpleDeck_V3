@@ -1,0 +1,45 @@
+# ============================================================================
+#  GREJEM Stream Deck - reguła udev (distro-agnostic, bez grupy plugdev)
+#  ----------------------------------------------------------------------------
+#  Daje aplikacji dostęp do urządzenia USB HID bez uruchamiania jako root.
+#  Działa na Fedora (brak grupy plugdev), Debianie i Ubuntu.
+#  MODE=0666 gwarantuje dostęp; TAG+=uaccess dodaje ACL dla aktywnego
+#  użytkownika konsoli (logind session).
+#
+#  Uwaga: NIE używamy GROUP="plugdev" — ta grupa nie istnieje na Fedorze, a
+#  udev przerywa aplikowanie całej reguły gdy nie może rozwiązać grupy
+#  ("Failed to resolve group 'plugdev', ignoring"). Bez GROUP reguła działa.
+#
+#  VID: 0x1209  (pid.codes - public)
+#  PID: 0xDE10  (GREJEM Stream Deck)
+#
+#  Instalacja ręczna:
+#    sudo cp 99-simple-deck.rules /etc/udev/rules.d/
+#    sudo udevadm control --reload-rules
+#    sudo udevadm trigger
+#    # odłącz i podłącz ponownie USB
+#
+#  Skrypt install.sh instaluje tę regułę automatycznie (patrz install.sh).
+# ============================================================================
+
+# --- USB device node (/dev/bus/usb/BBB/DDD) - używane przez hidapi (libusb) ---
+SUBSYSTEM=="usb", \
+    ATTRS{idVendor}=="1209", ATTRS{idProduct}=="de10", \
+    MODE="0666", \
+    TAG+="uaccess", \
+    SYMLINK+="simple-deck%n"
+
+# --- HID raw device (/dev/hidraw0, /dev/hidraw1, ...) ---
+# Dla backendu hidraw hidapi (gdy kernel zbindował hid-generic).
+KERNEL=="hidraw*", \
+    SUBSYSTEM=="hidraw", \
+    ATTRS{idVendor}=="1209", ATTRS{idProduct}=="de10", \
+    MODE="0666", \
+    TAG+="uaccess"
+
+# --- HID dev (/dev/usb/hiddev0, ...) - rzadziej używane ale dla pewności ---
+KERNEL=="hiddev*", \
+    SUBSYSTEM=="usbmisc", \
+    ATTRS{idVendor}=="1209", ATTRS{idProduct}=="de10", \
+    MODE="0666", \
+    TAG+="uaccess"

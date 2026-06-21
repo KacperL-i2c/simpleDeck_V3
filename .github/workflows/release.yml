@@ -1,0 +1,139 @@
+# ============================================================================
+#  Simple Deck - Release CI
+#  ----------------------------------------------------------------------------
+#  Buduje instalatory (.exe + .msi) na Windows runner i tworzy GitHub Release.
+#
+#  Wyzwalacze:
+#    1. Push tagu v* (np. v1.0.0)  -> automatyczny build + release
+#    2. workflow_dispatch           -> manualny build podanej wersji
+#
+#  Interakcja z lokalnym CLI (scripts/release.py):
+#    - Lokalny release.py (--ci) pushuje TYLKO tag; ten workflow buduje
+#      i tworzy release w chmurze.
+#    - Lokalny release.py (bez --ci) buduje lokalnie i tworzy release sam;
+#      ten workflow wykrywa istniejacy release i tylko re-uploaduje artefakty
+#      (CI-built, --clobber zastapi lokalne).
+# ============================================================================
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Wersja do zbudowania (bez prefixu v, np. 1.0.0)'
+        required: true
+        default: '1.0.0'
+
+permissions:
+  contents: write   # wymagane przez gh release create / upload
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Inno Setup 6
+        shell: pwsh
+        run: |
+          choco install innosetup --version=6.4.3 -y --no-progress
+          # Dodaj do PATH na wszelki wypadek
+          echo "C:\Program Files (x86)\Inno Setup 6" >> $env:GITHUB_PATH
+
+      - name: Install WiX v4
+        shell: pwsh
+        run: |
+          dotnet tool install -g wix
+          # .dotnet\tools jest zazwyczaj juz w PATH na windows-latest
+          echo "$env:USERPROFILE\.dotnet\tools" >> $env:GITHUB_PATH
+
+      - name: Resolve version
+        id: ver
+        shell: pwsh
+        run: |
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            $version = "${{ inputs.version }}"
+          } else {
+            # Tag push: usun prefix 'v'
+            $version = "${{ github.ref_name }}" -replace '^v', ''
+          }
+          Write-Host "Version: $version"
+          echo "version=$version" >> $env:GITHUB_OUTPUT
+          echo "tag=v$version" >> $env:GITHUB_OUTPUT
+
+      - name: Build installers
+        shell: pwsh
+        run: |
+          Set-Location installer\windows
+          .\build.ps1
+
+      - name: Verify artifacts
+        shell: pwsh
+        run: |
+          $v = "${{ steps.ver.outputs.version }}"
+          $exe = "installer\windows\output\Simple-Deck-Setup-$v.exe"
+          $msi = "installer\windows\output\Simple-Deck-$v.msi"
+          $found = $false
+          if (Test-Path $exe) {
+            $sz = [math]::Round((Get-Item $exe).Length / 1MB, 1)
+            Write-Host "  .exe: $exe ($sz MB)"
+            $found = $true
+          } else {
+            Write-Warning "  .exe NOT FOUND: $exe"
+          }
+          if (Test-Path $msi) {
+            $sz = [math]::Round((Get-Item $msi).Length / 1MB, 1)
+            Write-Host "  .msi: $msi ($sz MB)"
+            $found = $true
+          } else {
+            Write-Warning "  .msi NOT FOUND: $msi"
+          }
+          if (-not $found) {
+            throw "No installer artifacts found!"
+          }
+
+      - name: Create or update GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          $tag = "${{ steps.ver.outputs.tag }}"
+          $v = "${{ steps.ver.outputs.version }}"
+          $exe = "installer\windows\output\Simple-Deck-Setup-$v.exe"
+          $msi = "installer\windows\output\Simple-Deck-$v.msi"
+          $title = "Simple Deck v$v"
+
+          # Zbuduj liste artefaktow (tylko istniejace)
+          $assets = @()
+          if (Test-Path $exe) { $assets += $exe }
+          if (Test-Path $msi) { $assets += $msi }
+
+          # Czy release juz istnieje? (np. utworzony przez lokalny release.py)
+          $existing = $false
+          try {
+            gh release view $tag 2>$null
+            if ($LASTEXITCODE -eq 0) { $existing = $true }
+          } catch { }
+
+          if ($existing) {
+            Write-Host "Release $tag juz istnieje - upload artefaktow (--clobber)."
+            gh release upload $tag $assets --clobber
+          } else {
+            Write-Host "Tworze nowy release $tag."
+            gh release create $tag $assets `
+              --title $title `
+              --generate-notes
+          }
+
+          # Wyswietl URL
+          gh release view $tag --json url --jq .url

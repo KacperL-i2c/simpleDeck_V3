@@ -1,0 +1,15 @@
+# Artefakty budowania
+build/
+
+# Backupy edytorów
+*.bak
+*.swp
+*~
+
+# IDE
+.idea/
+.vscode/
+*.cbp
+
+# System
+.DS_Store
