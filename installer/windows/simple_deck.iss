@@ -108,13 +108,13 @@ Name: "{commonstartup}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; \
 ; Add/Remove Programs entry (dopełnienie Inno Setup)
 Root: HKLM; Subkey: "SOFTWARE\GREJEM INDUSTRIES\Simple Deck"; \
     ValueType: string; ValueName: "InstallPath"; ValueData: "{app}"; \
-    Flags: uninsdeletekey uninsdeletekeyifempty
+    Flags: uninsdeletekey
 Root: HKLM; Subkey: "SOFTWARE\GREJEM INDUSTRIES\Simple Deck"; \
     ValueType: string; ValueName: "Version"; ValueData: "{#MyAppVersion}"; \
-    Flags: uninsdeletekey uninsdeletekeyifempty
+    Flags: uninsdeletekey
 ; Dodatkowo: po odinstalowaniu usuń pusty klucz nadrzędny "GREJEM INDUSTRIES"
 Root: HKLM; Subkey: "SOFTWARE\GREJEM INDUSTRIES"; \
-    Flags: uninsdeletekey uninsdeletekeyifempty noerror
+    Flags: uninsdeletekeyifempty noerror
 
 ; USB HID nie wymaga sterownika - Windows ma go wbudowany (hid.dll / hidclass.sys)
 
