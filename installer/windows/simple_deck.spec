@@ -39,6 +39,9 @@ datas += [
     # Zestaw ikon SVG (Lucide-style) - potrzebne przez ui.widgets.icon
     (os.path.join(DESKTOP, "assets", "icons", "*.svg"),
      os.path.join("assets", "icons")),
+    # Font Inter - identyczna typografia na Windows i Linux
+    (os.path.join(DESKTOP, "assets", "fonts", "*.ttf"),
+     os.path.join("assets", "fonts")),
     (os.path.join(ICONS, "simple_deck.ico"), "icons"),
     (os.path.join(ICONS, "simple_deck_256.png"), "icons"),
 ]

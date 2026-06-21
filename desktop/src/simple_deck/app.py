@@ -15,8 +15,10 @@ from __future__ import annotations
 import logging
 import signal
 import sys
+from pathlib import Path
 from typing import Optional
 
+from PySide6.QtGui import QColor, QFontDatabase, QPalette
 from PySide6.QtWidgets import QApplication
 
 from .core.event_bus import EventBus
@@ -48,8 +50,77 @@ def configure_logging(verbose: bool = False) -> None:
     root.addHandler(handler)
 
 
+def _resource_path(rel: str) -> Path:
+    """Absolutna ścieżka do zasobu (dev mode / PyInstaller)."""
+    if getattr(sys, "frozen", False):
+        base = Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent))
+    else:
+        base = Path(__file__).resolve().parents[3]
+    return base / rel
+
+
+def _register_fonts() -> None:
+    """Rejestruje fonty z assets/fonts/ w QFontDatabase.
+
+    Gwarantuje identyczną typografię na Windows i Linux — "Inter" jest
+    instalowany systemowo na linuksowej maszynie dev, ale nie na Windows.
+    Bundle'ujemy 4 wagi (Regular/Medium/SemiBold/Bold) z aplikacją.
+    """
+    fonts_dir = _resource_path("assets/fonts")
+    if not fonts_dir.is_dir():
+        log.debug("fonts dir not found: %s", fonts_dir)
+        return
+    for ttf in sorted(fonts_dir.glob("*.ttf")):
+        font_id = QFontDatabase.addApplicationFont(str(ttf))
+        if font_id == -1:
+            log.warning("failed to register font: %s", ttf.name)
+        else:
+            families = QFontDatabase.applicationFontFamilies(font_id)
+            log.debug("registered font: %s -> %s", ttf.name, families)
+
+
+def _make_dark_palette() -> QPalette:
+    """Ciemna paleta Fusion dopasowana do glossy.qss.
+
+    QSS pokrywa większość widgetów, ale nie wszystko (tooltipy, placeholder
+    text, kontekstowe menu). Ta paleta zapewnia spójne ciemne tło dla
+    nieostylowanych elementów na każdej platformie.
+    """
+    p = QPalette()
+    bg = QColor("#161624")
+    bg_alt = QColor("#1C1E2A")
+    text = QColor("#F5F7FA")
+    text_dim = QColor("#A5ABC0")
+    text_muted = QColor("#6A7080")
+    border = QColor("#2A2D3A")
+    accent = QColor("#2DD4FF")
+
+    p.setColor(QPalette.Window, bg)
+    p.setColor(QPalette.WindowText, text)
+    p.setColor(QPalette.Base, bg_alt)
+    p.setColor(QPalette.AlternateBase, bg)
+    p.setColor(QPalette.Text, text)
+    p.setColor(QPalette.Button, bg)
+    p.setColor(QPalette.ButtonText, text)
+    p.setColor(QPalette.BrightText, QColor("#FF5C6C"))
+    p.setColor(QPalette.ToolTipBase, bg_alt)
+    p.setColor(QPalette.ToolTipText, text)
+    p.setColor(QPalette.PlaceholderText, text_muted)
+    p.setColor(QPalette.Highlight, QColor(45, 212, 255, 60))
+    p.setColor(QPalette.HighlightedText, text)
+    p.setColor(QPalette.Link, accent)
+    p.setColor(QPalette.LinkVisited, accent)
+
+    # Disabled state
+    p.setColor(QPalette.Disabled, QPalette.WindowText, text_muted)
+    p.setColor(QPalette.Disabled, QPalette.Text, text_muted)
+    p.setColor(QPalette.Disabled, QPalette.ButtonText, text_muted)
+
+    return p
+
+
 def create_app(argv: Optional[list[str]] = None) -> QApplication:
-    """Tworzy QApplication z wysoką DPI i metadanymi aplikacji."""
+    """Tworzy QApplication z metadanymi, fontami i ciemną paletą Fusion."""
     if argv is None:
         argv = sys.argv
     # V7: Wycisz Qt debug logi (font cache probing, QPA platform warnings pod
@@ -59,6 +130,18 @@ def create_app(argv: Optional[list[str]] = None) -> QApplication:
     os.environ.setdefault("QT_LOGGING_RULES",
                           "*.debug=false;qt.qpa.*=warning")
     app = QApplication(argv)
+
+    # Fusion style — identyczny rendering widgetów na Windows i Linux
+    # (bez tego Windows używa 'windowsvista', Linux 'gtk2'/'fusion' → różnice
+    # w scrollbarach, sliderach, checkboxach, combo boxach, przyciskach).
+    app.setStyle("Fusion")
+
+    # Zarejestruj fonty (Inter) przed utworzeniem jakichkolwiek widgetów
+    _register_fonts()
+
+    # Ciemna paleta bazowa dla nieostylowanych elementów (tooltipy, menu)
+    app.setPalette(_make_dark_palette())
+
     app.setApplicationName("Simple Deck")
     app.setApplicationDisplayName("Simple Deck")
     app.setOrganizationName("GREJEM INDUSTRIES")

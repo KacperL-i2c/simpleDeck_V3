@@ -23,7 +23,7 @@ from typing import Optional
 
 from PySide6.QtCore import Qt, QPoint, Signal
 from PySide6.QtGui import QColor, QMouseEvent
-from PySide6.QtWidgets import (QFrame, QGraphicsDropShadowEffect,
+from PySide6.QtWidgets import (QApplication, QFrame, QGraphicsDropShadowEffect,
                                 QHBoxLayout, QLabel, QMainWindow, QPushButton,
                                 QSizePolicy, QStackedWidget, QVBoxLayout,
                                 QWidget)
@@ -279,6 +279,12 @@ class MainWindow(QMainWindow):
         # 1. QSS - podmień domyślny akcent na nowy
         qss = self._qss_template.replace(DEFAULT_ACCENT_HEX, color)
         self.setStyleSheet(qss)
+        # 1b. QSS na poziomie aplikacji - tematyzuje dialogi, menu kontekstowe,
+        # tooltipy które nie są dziećmi MainWindow. Window-level QSS nadal ma
+        # priorytet dla widgetów okna głównego (brak konfliktu).
+        app = QApplication.instance()
+        if app is not None:
+            app.setStyleSheet(qss)
         # 2. Ikony - wyczyść cache i przebarwij wszystkie IconLabel
         clear_icon_cache()
         for lbl in self.findChildren(IconLabel):

@@ -33,7 +33,7 @@ simple-deck-gui = "simple_deck.__main__:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-simple_deck = ["../../assets/**/*.qss", "../../assets/**/*.svg", "../../assets/**/*.png"]
+simple_deck = ["../../assets/**/*.qss", "../../assets/**/*.svg", "../../assets/**/*.png", "../../assets/**/*.ttf"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
