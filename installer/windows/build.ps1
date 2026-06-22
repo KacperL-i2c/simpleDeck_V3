@@ -96,13 +96,11 @@ function Find-WixToolset {
                 (Get-Command wix.exe -ErrorAction SilentlyContinue).Source
             } else { $c }
             if ($resolved -and (Test-Path $resolved)) {
-                # Zweryfikuj że to v4+ (dowolny 'wix N.x...' w wersji).
-                # Początkowo sprawdzaliśmy tylko "wix.*4\.", ale dotnet tool
-                # dystrybuuje już v5/v6/v7 z tą samą ujednoliconą CLI.
-                $verOut = & $resolved --version 2>&1 | Out-String
-                if ($LASTEXITCODE -eq 0 -and $verOut -match "wix\s+\d") {
-                    return @{ Version = "v4"; WixExe = $resolved }
-                }
+                # Dowolny 'wix.exe' to v4+ - v3 nie dystrybuował unified 'wix.exe'
+                # (miało osobne candle.exe/light.exe/heat.exe). Nie sprawdzamy
+                # wersji: dotnet tool rozdaje v5/v6/v7, wszystkie mają tę samą CLI.
+                Write-Host "  WiX v4+ znaleziony: $resolved" -ForegroundColor DarkGray
+                return @{ Version = "v4"; WixExe = $resolved }
             }
         } catch { }
     }
