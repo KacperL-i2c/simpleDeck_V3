@@ -96,9 +96,11 @@ function Find-WixToolset {
                 (Get-Command wix.exe -ErrorAction SilentlyContinue).Source
             } else { $c }
             if ($resolved -and (Test-Path $resolved)) {
-                # Zweryfikuj że to v4 (wix 4 odpisze z wersją)
+                # Zweryfikuj że to v4+ (dowolny 'wix N.x...' w wersji).
+                # Początkowo sprawdzaliśmy tylko "wix.*4\.", ale dotnet tool
+                # dystrybuuje już v5/v6/v7 z tą samą ujednoliconą CLI.
                 $verOut = & $resolved --version 2>&1 | Out-String
-                if ($LASTEXITCODE -eq 0 -and $verOut -match "wix.*4\.") {
+                if ($LASTEXITCODE -eq 0 -and $verOut -match "wix\s+\d") {
                     return @{ Version = "v4"; WixExe = $resolved }
                 }
             }
@@ -297,9 +299,11 @@ if (-not $SkipMsi) {
         if ($LASTEXITCODE -ne 0) { throw "heat failed" }
 
         Write-Host "  [v3] candle: compile .wxs -> .wixobj"
+        # WiX v3 candle wymaga '-dName=Value' jako jeden token (bez spacji).
+        # PowerShell tokenizuje '-d "Name=Value"' na dwa argumenty.
         & $wix.Candle `
-            -d "AppVersion=$appVersion" `
-            -out "$objDir\" `
+            "-dAppVersion=$appVersion" `
+            "-out" "$objDir\" `
             "$wixSource" "$heatOut"
         if ($LASTEXITCODE -ne 0) { throw "candle failed" }
 
