@@ -26,7 +26,7 @@ block_cipher = None
 # na PySide6 który zbiera tylko potrzebne submoduły na podstawie imports.
 #
 # ctypes.macholib jest macOS-only - usunięto (m).
-hiddenimports = ["hidapi", "ctypes.wintypes"]
+hiddenimports = ["hid", "ctypes.wintypes"]
 
 # Dane nieruchome: QSS, ikony, pluginy Qt (platforms/styles/imageformats)
 datas = []
@@ -47,7 +47,7 @@ datas += [
 ]
 
 a = Analysis(
-    [os.path.join(DESKTOP, "src", "simple_deck", "__main__.py")],
+    [os.path.join(HERE, "launch.py")],
     pathex=[os.path.join(DESKTOP, "src")],
     binaries=[],
     datas=datas,
