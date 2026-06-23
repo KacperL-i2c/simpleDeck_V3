@@ -128,7 +128,7 @@ def create_app(argv: Optional[list[str]] = None) -> QApplication:
     # Zachowuje warnings/errors (tylko *.debug + qt.qpa poniżej warning).
     import os
     os.environ.setdefault("QT_LOGGING_RULES",
-                          "*.debug=false;qt.qpa.*=warning")
+                          "*.debug=false;qt.qpa.*=false")
     app = QApplication(argv)
 
     # Fusion style — identyczny rendering widgetów na Windows i Linux

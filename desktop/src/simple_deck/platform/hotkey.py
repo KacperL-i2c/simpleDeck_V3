@@ -100,7 +100,7 @@ class WindowsHotkeyBackend(HotkeyBackend):
             _fields_ = [("type", wintypes.DWORD), ("u", INPUT_UNION)]
 
         self._INPUT = INPUT
-        user32.SendInput.argtypes = [wintypes.UINT, ctypes.POINTER(INPUT), wintypes.c_int]
+        user32.SendInput.argtypes = [wintypes.UINT, ctypes.POINTER(INPUT), wintypes.INT]
         user32.SendInput.restype = wintypes.UINT
         user32.VkKeyScanW.argtypes = [wintypes.WCHAR]
         user32.VkKeyScanW.restype = wintypes.SHORT

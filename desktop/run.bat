@@ -22,7 +22,6 @@ cd /d "%~dp0"
 
 set "VENV=.venv"
 set "PYTHON=%VENV%\Scripts\python.exe"
-set "PIP=%VENV%\Scripts\pip.exe"
 
 REM ---- Help ----
 if /I "%~1"=="--help" goto :help
@@ -44,7 +43,7 @@ exit /b 0
 
 REM ---- Krok 1: venv (jednorazowo) ----
 if not exist "%PYTHON%" (
-    echo [setup] Tworzenie virtualenv ^(.venv^\)...
+    echo [setup] Tworzenie virtualenv .venv ...
     where python >nul 2>&1
     if errorlevel 1 (
         echo BLAD: python nie znaleziony w PATH. Zainstaluj Python 3.10+ z https://python.org
@@ -55,7 +54,7 @@ if not exist "%PYTHON%" (
         echo BLAD: nie udalo sie utworzyc venv
         exit /b 1
     )
-    "%PIP%" install --quiet --upgrade pip wheel setuptools
+    "%PYTHON%" -m pip install --quiet --upgrade pip wheel setuptools
     if errorlevel 1 (
         echo BLAD: nie udalo sie zaktualizowac pip
         exit /b 1
@@ -67,9 +66,9 @@ REM ---- Krok 2: instalacja zaleznosci (idempotentnie) ----
 REM UWAGA: pip package "hidapi" importuje sie jako modul `hid`
 "%PYTHON%" -c "import PySide6, hid" >nul 2>&1
 if errorlevel 1 (
-    echo [setup] Instalacja zaleznosci ^(jednorazowo, potrwa ~60 s^)...
+    echo [setup] Instalacja zaleznosci - jednorazowo, potrwa ~60 s ...
     echo [setup]   wykryto Windows - instalacja z extras [windows]
-    "%PIP%" install -e ".[windows]"
+    "%PYTHON%" -m pip install -e ".[windows]"
     if errorlevel 1 (
         echo BLAD: instalacja zaleznosci nie powiodla sie
         exit /b 1
