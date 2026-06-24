@@ -73,11 +73,11 @@ static const uint8_t hid_report_descriptor[] = {
 static const struct usb_device_descriptor device_descriptor = {
     .bLength            = USB_DT_DEVICE_SIZE,
     .bDescriptorType    = USB_DT_DEVICE,
-    .bcdUSB             = 0x0110,                  /* USB 1.1 (Full Speed) */
-    .bDeviceClass       = 0,                       /* Defined at interface level */
+    .bcdUSB             = 0x0200,                  /* USB 2.0              */
+    .bDeviceClass       = 0,                       /* class zdefiniowany na poziomie interfejsu (standard HID) */
     .bDeviceSubClass    = 0,
     .bDeviceProtocol    = 0,
-    .bMaxPacketSize0    = 64,                      /* EP0                  */
+    .bMaxPacketSize0    = 8,                       /* EP0 — bezpieczne dla Windows timing */
     .idVendor           = BOARD_USB_VID,
     .idProduct          = BOARD_USB_PID,
     .bcdDevice          = 0x0100,
@@ -148,11 +148,7 @@ static const struct usb_interface ifaces[] = {{
 static const struct usb_config_descriptor config_descriptor = {
     .bLength             = USB_DT_CONFIGURATION_SIZE,
     .bDescriptorType     = USB_DT_CONFIGURATION,
-    .wTotalLength        = USB_DT_CONFIGURATION_SIZE    /* 9  config          */
-                         + USB_DT_INTERFACE_SIZE        /* 9  interface       */
-                         + sizeof(hid_function)         /* 9  HID descriptor  */
-                         + 2 * USB_DT_ENDPOINT_SIZE,    /* 14 2× endpoint     */
-                         /* = 41 bytes total */
+    .wTotalLength        = 0,                      /* wyliczane automatycznie */
     .bNumInterfaces      = 1,
     .bConfigurationValue = 1,
     .iConfiguration      = 0,
@@ -233,6 +229,11 @@ static enum usbd_request_return_codes hid_control_request(usbd_device *dev,
         *len = sizeof(hid_report_descriptor);
         return USBD_REQ_HANDLED;
     }
+    /* Windows HID class driver (hidusb.sys) wysyła osobne GET_DESCRIPTOR(HID)
+     * niezależnie od configuration descriptor. libopencm3 usb_standard.c NIE
+     * obsługuje USB_DT_HID (0x21) — pole `extra` interfejsu jest używane tylko
+     * do budowy configuration descriptor, nie do odpowiedzi na to żądanie.
+     * Bez tego handlera → USBD_REQ_NOTSUPP → EP0 STALL → Windows Code 10. */
     if (desc_type == USB_DT_HID) {
         *buf = (uint8_t *)&hid_function;
         *len = sizeof(hid_function);
@@ -246,7 +247,11 @@ static enum usbd_request_return_codes hid_control_request(usbd_device *dev,
  * =========================================================================== */
 void usbhid_init(void) {
     /* USB 48 MHz pochodzi z PLL (konfiguracja rcc_clock_setup_pll w main.c).
-     * Włącz taktowanie bloku USB i przerwania. */
+     * Włącz taktowanie bloku USB bezpośrednio przed konfiguracją stacku,
+     * by D+ pull-up aktywował się dopiero gdy USB peripheral jest gotowy
+     * (eliminuje race z pierwszym USB reset od hosta). */
+    rcc_periph_clock_enable(RCC_USB);
+
     usbd_dev = usbd_init(&st_usbfs_v1_usb_driver,
                          &device_descriptor,
                          &config_descriptor,
@@ -262,11 +267,39 @@ void usbhid_init(void) {
                                    USB_REQ_TYPE_TYPE | USB_REQ_TYPE_RECIPIENT,
                                    hid_control_request);
 
-    /* C3 fix REMOVED: soft-disconnect/reconnect powodował race condition
-     * z Windows USB stack. Standardowy flow libopencm3: usbd_init() ustawia
-     * CNTR z RESETM, host wykrywa D+ pull-up, wysyła USB reset → _usbd_reset()
-     * konfiguruje EP0 i włącza DADDR.EF.  Działa dla cold-boot i physical replug.
-     * Uwaga: po SWD/warm reset może wymagać physical replug (brak soft-disconnect). */
+    /* C3 fix: soft-disconnect/reconnect wymuszający host re-enumeration.
+     *
+     * Problem: po reset MCU (SWD, wdg, brownout) zewnętrzny pull-up 1.5k
+     * na D+ (PA12) pozostaje aktywny cały czas.  Host nie widzi disconnect
+     * → nie wysyła USB bus reset → _usbd_reset() nigdy nie leci → urządzenie
+     * wisi: lsusb widzi 1209:de10, ale DADDR=0x0000 (EF=0), EP0 DISABLED,
+     * usb_configured=0.  Tylko physical replug lub `usbreset` pomagało.
+     *
+     * libopencm3 st_usbfs_v1_usbd_init() celowo NIE włącza DADDR.EF ani
+     * nie konfiguruje EP0 — to robota _usbd_reset() wywoływanego z ISR.
+     * Ale _usbd_reset() wymaga ISTR.RESET od hosta, którego nie ma bez
+     * disconnect/reconnect.
+     *
+     * Fix (2 etapy):
+     *
+     *   1) Soft-disconnect: power-down transceiver (CNTR.PWDN), przestaw
+     *      PA12 na push-pull LOW na ~100 ms.  Host widzi SE0 (D+ < 0.8V)
+     *      → rozłącza urządzenie.  Bez PWDN transceiver walczyłby z GPIO.
+     *
+     *   2) Reconnect + EP0 bootstrap: zwolnij PA12 (analog input), wyczyść
+     *      PWDN/ISTR, skonfiguruj EP0 i włącz DADDR.EF.  Host wykrywa D+
+     *      rising → wysyła USB reset → _usbd_reset() przejmuje.
+     *
+     * Konfiguracja EP0 w kroku 2 jest redundantna z _usbd_reset() (który
+     * host wywoła po ~10-50 ms), ale zapewnia gotowość od razu.  Bufory:
+     * BTABLE@0 (8 ep × 8 B = 64 B), EP0 TX@0x40, RX@0x80.  pm_top zostaje
+     * naprawiony przez ep_reset() przy SET_CONFIGURATION (→ 0xC0).
+     */
+    /* C3 fix wyłączony: soft-disconnect + manualny EP0 setup AFTER usbd_init
+     * interfere z enumeracją Windows (race z _usbd_reset hosta). Standardowy
+     * flow libopencm3 powinien wystarczyć: usbd_init() ustawia CNTR z RESETM,
+     * host wykrywa D+ pull-up, wysyła USB reset → _usbd_reset() konfiguruje
+     * EP0 i włącza DADDR.EF automatycznie. */
 
     /* Włącz przerwania USB. F103 dzieli wektory CAN/USB - używamy obu IRQ. */
     nvic_set_priority(NVIC_USB_LP_CAN_RX0_IRQ, 2);   /* niższy niż DMA  */

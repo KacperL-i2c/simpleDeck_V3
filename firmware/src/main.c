@@ -50,7 +50,8 @@ static void clock_setup(void) {
     rcc_periph_clock_enable(RCC_GPIOC);
     rcc_periph_clock_enable(RCC_GPIOD);
     rcc_periph_clock_enable(RCC_AFIO);    /* dla remapu / USB PD */
-    rcc_periph_clock_enable(RCC_USB);
+    /* RCC_USB włączone w usbhid_init() — by D+ pull-up aktywował się
+     * dopiero gdy USB stack jest skonfigurowany (eliminuje race condition). */
     rcc_periph_clock_enable(RCC_ADC1);
     rcc_periph_clock_enable(RCC_DMA1);
     rcc_periph_clock_enable(RCC_TIM2);    /* C10: HW PWM dla PB10/PB11 */
