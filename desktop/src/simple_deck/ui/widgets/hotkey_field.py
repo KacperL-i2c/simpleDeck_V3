@@ -341,11 +341,14 @@ class HotkeyField(QLineEdit):
                     grabber = None
             except Exception:
                 grabber = None
-        dlg.grabKeyboard()
+        _is_linux = sys.platform.startswith("linux")
+        if _is_linux:
+            dlg.grabKeyboard()
         try:
             result = dlg.exec()
         finally:
-            dlg.releaseKeyboard()
+            if _is_linux:
+                dlg.releaseKeyboard()
             if grabber is not None:
                 grabber.release()
 
