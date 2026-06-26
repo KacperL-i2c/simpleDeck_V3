@@ -141,14 +141,9 @@ class WindowsAudioBackend(AudioBackend):
         return None
 
     def _get_master(self):
-        """Zwraca interfejs IAudioEndpointVolume dla domyślnego urządzenia wyjściowego.
-
-        B2 fix: Activate() wymaga 3 argumentów (IID, CLSCTX, params).
-        Pierwszy to IID IAudioEndpointVolume, nie CLSCTX_ALL.
-        """
+        """Zwraca interfejs IAudioEndpointVolume dla domyślnego urządzenia wyjściowego."""
         devices = self._AudioUtilities.GetSpeakers()
-        # Activate(riid, clsctx, activation_params) → IAudioEndpointVolume
-        return devices.Activate(self._volume_iid, self._CLSCTX_ALL, None)
+        return devices.EndpointVolume
 
     def get_volume(self, target: Optional[str] = None) -> float:
         try:
@@ -214,9 +209,11 @@ class WindowsAudioBackend(AudioBackend):
                     return 0.0
                 meter = s._ctl.QueryInterface(IAudioMeterInformation)
             else:
+                from ctypes import cast, POINTER
                 devices = self._AudioUtilities.GetSpeakers()
-                meter = devices.Activate(IAudioMeterInformation._iid_,
-                                         self._CLSCTX_ALL, None)
+                meter = devices._dev.Activate(IAudioMeterInformation._iid_,
+                                              self._CLSCTX_ALL, None)
+                meter = cast(meter, POINTER(IAudioMeterInformation))
             return float(meter.GetPeakValue())
         except Exception:
             return 0.0
