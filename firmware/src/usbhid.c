@@ -77,7 +77,7 @@ static const struct usb_device_descriptor device_descriptor = {
     .bDeviceClass       = 0,                       /* class zdefiniowany na poziomie interfejsu (standard HID) */
     .bDeviceSubClass    = 0,
     .bDeviceProtocol    = 0,
-    .bMaxPacketSize0    = 8,                       /* EP0 — bezpieczne dla Windows timing */
+    .bMaxPacketSize0    = 64,                     /* EP0 — full-speed standard (8→64) */
     .idVendor           = BOARD_USB_VID,
     .idProduct          = BOARD_USB_PID,
     .bcdDevice          = 0x0100,
@@ -180,6 +180,12 @@ static uint8_t hid_in_buf [CFG_HID_EP_SIZE];
  *  Callbacki USB
  * =========================================================================== */
 
+/* Forward — hid_set_config re-rejestruje ten callback po SET_CONFIGURATION. */
+static enum usbd_request_return_codes hid_control_request(usbd_device *dev,
+                                struct usb_setup_data *req,
+                                uint8_t **buf, uint16_t *len,
+                                usbd_control_complete_callback *complete);
+
 /* EP1 OUT - przychodzący raport od PC (komenda do MCU) */
 static void hid_out_callback(usbd_device *dev, uint8_t ep) {
     (void)ep;
@@ -198,6 +204,16 @@ static void hid_set_config(usbd_device *dev, uint16_t wValue) {
                   CFG_HID_EP_SIZE, NULL);
     usbd_ep_setup(dev, CFG_HID_EP_OUT, USB_ENDPOINT_ATTR_INTERRUPT,
                   CFG_HID_EP_SIZE, hid_out_callback);
+
+    /* KRYTYCZNE: libopencm3 usb_standard_set_configuration() czyści WSZYSTKIE
+     * control callbacks (usb_standard.c:349-351).  Bez ponownej rejestracji
+     * Windows hidusb.sys GET_DESCRIPTOR(HID/REPORT) → STALL → Code 10.
+     * Linux usbhid toleruje brak callbacku (czyta z config descriptor). */
+    usbd_register_control_callback(dev,
+                                   USB_REQ_TYPE_STANDARD | USB_REQ_TYPE_INTERFACE,
+                                   USB_REQ_TYPE_TYPE | USB_REQ_TYPE_RECIPIENT,
+                                   hid_control_request);
+
     usb_configured = 1;
 }
 
