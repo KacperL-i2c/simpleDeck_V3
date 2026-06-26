@@ -142,6 +142,9 @@ class MainWindow(QMainWindow):
         self._page_settings = None
         self._stack.setCurrentWidget(self._page_overview)
 
+        # Klik na potencjometr w Overview → nawigacja do PotsPage
+        self._page_overview.pot_clicked.connect(lambda *_: self._set_page(1))
+
         # Status wiring
         self._conn.state_changed.connect(self._on_state_changed)
         self._on_state_changed(self._conn.state)

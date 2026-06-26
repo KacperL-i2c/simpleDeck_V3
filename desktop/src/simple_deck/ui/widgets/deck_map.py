@@ -7,7 +7,7 @@ podświetlają po wciśnięciu, VU bar odzwierciedla poziom głośności.
 """
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, Slot
+from PySide6.QtCore import Qt, Signal, Slot
 from PySide6.QtWidgets import (QFrame, QGridLayout, QHBoxLayout, QLabel,
                                 QProgressBar, QPushButton, QSizePolicy,
                                 QVBoxLayout)
@@ -20,6 +20,8 @@ from ...transport.protocol import (ADC_RANGE, ACTIVE_LED_COUNT,
 class _PotCell(QFrame):
     """Karta wizualizująca jeden potencjometr: nazwa + wartość + pasek."""
 
+    clicked = Signal()
+
     def __init__(self, idx: int, parent=None):
         super().__init__(parent)
         self._idx = idx
@@ -28,6 +30,7 @@ class _PotCell(QFrame):
         self.setProperty("selected", "false")
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.setFixedHeight(96)
+        self.setCursor(Qt.PointingHandCursor)
 
         lay = QVBoxLayout(self)
         lay.setContentsMargins(14, 10, 14, 10)
@@ -75,6 +78,11 @@ class _PotCell(QFrame):
         self._last_value = v
         self._bar.setValue(v)
         self._value_label.setText(f"{v * 100 // (ADC_RANGE - 1)}%")
+
+    def mousePressEvent(self, event) -> None:
+        if event.button() == Qt.LeftButton:
+            self.clicked.emit()
+        super().mousePressEvent(event)
 
 
 class _ButtonCell(QPushButton):
@@ -212,6 +220,8 @@ class DeckMap(QFrame):
     POT_EVT. Dzięki temu paski nie są puste przy otwarciu aplikacji.
     """
 
+    pot_clicked = Signal(int)  # idx potencjometru — klik na karcie Overview
+
     def __init__(self, bus: EventBus, settings=None, parent=None):
         super().__init__(parent)
         self.setObjectName("card")
@@ -249,6 +259,7 @@ class DeckMap(QFrame):
         self._pot_grid.setSpacing(10)
         self._pots = [_PotCell(i) for i in range(POT_COUNT)]
         for i, cell in enumerate(self._pots):
+            cell.clicked.connect(lambda idx=i: self.pot_clicked.emit(idx))
             self._pot_grid.addWidget(cell, 0, i)
         outer.addLayout(self._pot_grid)
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from collections import deque
 
-from PySide6.QtCore import Qt, QTimer, Slot
+from PySide6.QtCore import Qt, QTimer, Signal, Slot
 from PySide6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QScrollArea,
                                 QVBoxLayout, QWidget)
 
@@ -14,6 +14,8 @@ from ..widgets.deck_map import DeckMap
 
 class OverviewPage(QWidget):
     """Strona główna - dashboard."""
+
+    pot_clicked = Signal(int)  # klik na potencjometr → MainWindow nawiguje do PotsPage
 
     def __init__(self, bus: EventBus, connection: ConnectionManager,
                  settings=None, parent=None):
@@ -51,6 +53,7 @@ class OverviewPage(QWidget):
 
         # DeckMap - wizualizacja
         self._deck_map = DeckMap(bus=bus, settings=self._settings)
+        self._deck_map.pot_clicked.connect(self.pot_clicked)
         lay.addWidget(self._deck_map)
 
         # Ostatnie zdarzenia - karta
