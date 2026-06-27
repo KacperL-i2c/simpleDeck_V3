@@ -329,7 +329,16 @@ class MainWindow(QMainWindow):
         V7: Również import modułów jest lazy — oszczędza kolejze ~80-150 ms
         cold-start pomijając parse 897-line config_pages.py + 361-line led_page.py
         gdy user nigdy nie otwiera Pots/Buttons/LED/Settings.
+
+        FIX: Buduj wszystkie strony od 1 do idx w kolejności — insertWidget(i)
+        wymaga że indeksy 1..i-1 są już w stacku, inaczej lądują na złych
+        pozycjach (np. skok do Przycisków bez wizyty w Potencjometrach).
         """
+        for i in range(1, idx + 1):
+            self._build_page(i)
+
+    def _build_page(self, idx: int) -> None:
+        """Zbuduj pojedynczą stronę jeśli jeszcze nie istnieje."""
         if idx == 0 or self._stack.widget(idx) is not None:
             return  # Overview (zawsze zbudowany) lub już zbudowana
         if idx == 1 and self._page_pots is None:
