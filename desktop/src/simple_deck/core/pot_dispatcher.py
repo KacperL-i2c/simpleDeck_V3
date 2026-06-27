@@ -96,6 +96,32 @@ class PotDispatcher(QObject):
 
     def set_profile(self, profile: Profile) -> None:
         self._profile = profile
+        self._sync_volumes_from_cache()
+
+    def _sync_volumes_from_cache(self) -> None:
+        """Ustaw głośności w mikserze na podstawie ostatnich znanych wartości ADC.
+
+        Bez tego po starcie / zmianie profilu mikser zachowuje głośność z
+        poprzedniej sesji — dispatcher wysyła set_volume dopiero gdy MCU
+        wyśle POT_EVT (czyli gdy user poruszy potencjometrem).
+        """
+        if self._profile is None or self._audio is None or self._settings is None:
+            return
+        cached = getattr(self._settings, "last_pot_values", [])
+        for idx, cfg in enumerate(self._profile.pots):
+            if idx >= len(cached) or cached[idx] < 0:
+                continue
+            if cfg.action not in (PotAction.SYSTEM_VOLUME, PotAction.APP_VOLUME,
+                                  PotAction.GAME_VOLUME):
+                continue
+            if not cfg.enabled:
+                continue
+            vol = self._map_volume(cfg, cached[idx])
+            target = cfg.target if cfg.action == PotAction.APP_VOLUME else None
+            try:
+                self._audio.set_volume(vol, target=target)
+            except Exception:
+                log.debug("sync volume failed for pot %d", idx)
 
     def set_audio_backend(self, audio_backend) -> None:
         self._audio = audio_backend
