@@ -197,7 +197,9 @@ def wire_application(app: QApplication, demo_mode: bool = False,
     # 6b. Pot dispatcher - nasłuchuje pot_event i steruje głośnością audio.
     # Bez tego potencjometry tylko animują UI, nie regulują dźwięku.
     pot_disp = PotDispatcher(bus=bus, audio_backend=audio_backend,
-                              settings=settings, parent=app)
+                              settings=settings,
+                              window_backend=window_backend,
+                              parent=app)
     if profile is not None:
         pot_disp.set_profile(profile)
 

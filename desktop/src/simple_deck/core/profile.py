@@ -22,6 +22,7 @@ class PotAction(str, Enum):
     NONE = "none"
     SYSTEM_VOLUME = "system_volume"     # główny mikser systemu
     APP_VOLUME = "app_volume"           # konkretny proces (nazwa w `target`)
+    GAME_VOLUME = "game_volume"         # auto-wykrywanie gry z listy (settings.game_apps)
     NONE_ALT = "disabled"
 
 

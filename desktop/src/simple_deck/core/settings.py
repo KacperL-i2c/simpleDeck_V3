@@ -101,6 +101,9 @@ class Settings:
     # V6: Tray icon — opt-in (domyślnie wyłączone wg preferencji usera)
     show_tray_icon: bool = False
     minimize_to_tray_on_close: bool = False
+    # Lista procesów oznaczonych jako gry (dla PotAction.GAME_VOLUME).
+    # Nazwy lowercase, np. ["cs2.exe", "witcher3.exe"].
+    game_apps: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return {
@@ -114,6 +117,7 @@ class Settings:
             "last_pot_values": [int(v) for v in self.last_pot_values],
             "show_tray_icon": bool(self.show_tray_icon),
             "minimize_to_tray_on_close": bool(self.minimize_to_tray_on_close),
+            "game_apps": [str(a).lower() for a in self.game_apps],
         }
 
     @classmethod
@@ -149,6 +153,7 @@ class Settings:
             last_pot_values=lpv,
             show_tray_icon=bool(d.get("show_tray_icon", False)),
             minimize_to_tray_on_close=bool(d.get("minimize_to_tray_on_close", False)),
+            game_apps=[str(a).lower() for a in (d.get("game_apps") or [])],
         )
 
     def to_json(self, path: Path) -> None:

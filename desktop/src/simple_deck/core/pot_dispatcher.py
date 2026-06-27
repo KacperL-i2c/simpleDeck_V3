@@ -61,11 +61,13 @@ class PotDispatcher(QObject):
     """Słucha ``pot_event`` i steruje głośnością przez ``audio_backend``."""
 
     def __init__(self, bus: EventBus, audio_backend=None,
-                 settings=None, parent: Optional[QObject] = None):
+                 settings=None, window_backend=None,
+                 parent: Optional[QObject] = None):
         super().__init__(parent)
         self._bus = bus
         self._audio = audio_backend
         self._settings = settings
+        self._window_backend = window_backend
         self._profile: Optional[Profile] = None
 
         # Koalescencja: idx -> ostatnia wyliczona głośność (jeszcze niewysłana)
@@ -86,6 +88,11 @@ class PotDispatcher(QObject):
         self._persist_timer.timeout.connect(self._flush_persist)
 
         bus.pot_event.connect(self._on_pot)
+
+        # Cache foreground process name (TTL 1 s) — unikaj Win32 RPC na każdym
+        # flush (30 Hz). Przetrzymywany między wywołaniami _flush.
+        self._cached_fg_proc: str = ""
+        self._cached_fg_at: float = 0.0
 
     def set_profile(self, profile: Profile) -> None:
         self._profile = profile
@@ -122,7 +129,8 @@ class PotDispatcher(QObject):
         # Każdy włączony potencjometr steruje linijką VU, niezależnie czy
         # reguluje głośność (SYSTEM_VOLUME / APP_VOLUME) czy ma action=NONE.
         # Set_volume flush natomiast odpala się tylko dla potów głośnościowych.
-        is_volume = cfg.action in (PotAction.SYSTEM_VOLUME, PotAction.APP_VOLUME)
+        is_volume = cfg.action in (PotAction.SYSTEM_VOLUME, PotAction.APP_VOLUME,
+                                    PotAction.GAME_VOLUME)
         level = self._map_volume(cfg, adc) if is_volume else self._raw_level(cfg, adc)
         self._bus.pot_level.emit(idx, level)
 
@@ -165,10 +173,36 @@ class PotDispatcher(QObject):
             vol *= sens
         return max(0.0, min(1.0, vol))
 
+    def _get_foreground_proc(self) -> str:
+        """Zwraca nazwę procesu aktywnej aplikacji (cached, TTL 1 s)."""
+        now = time.monotonic()
+        if self._cached_fg_proc and (now - self._cached_fg_at) < 1.0:
+            return self._cached_fg_proc
+        if self._window_backend is not None:
+            try:
+                proc = self._window_backend.active_process_name() or ""
+            except Exception:
+                proc = ""
+            self._cached_fg_proc = proc
+            self._cached_fg_at = now
+            return proc
+        return ""
+
     def _flush(self) -> None:
         """Wyślij wszystkie oczekujące wartości głośności do backendu audio."""
         if not self._pending or self._audio is None or self._profile is None:
             return
+        # Cache foreground proc raz per flush — wspólne dla wszystkich potów GAME_VOLUME
+        fg_proc = ""
+        has_game_pot = any(
+            idx < len(self._profile.pots)
+            and self._profile.pots[idx].action == PotAction.GAME_VOLUME
+            for idx in self._pending
+        )
+        if has_game_pot:
+            fg_proc = self._get_foreground_proc()
+            game_apps = [a.lower() for a in getattr(self._settings, "game_apps", [])] \
+                if self._settings else []
         for idx, vol in list(self._pending.items()):
             try:
                 target = None
@@ -176,6 +210,12 @@ class PotDispatcher(QObject):
                     cfg = self._profile.pots[idx]
                     if cfg.action == PotAction.APP_VOLUME:
                         target = cfg.target or None
+                    elif cfg.action == PotAction.GAME_VOLUME:
+                        # Sprawdź czy foreground proc jest na liście gier.
+                        if fg_proc and fg_proc in game_apps:
+                            target = fg_proc
+                        else:
+                            continue  # brak gry → nic nie rób
                 self._audio.set_volume(vol, target=target)
             except Exception:
                 log.exception("set_volume failed for pot %d", idx)

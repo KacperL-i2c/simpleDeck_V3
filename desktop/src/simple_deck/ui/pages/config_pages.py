@@ -453,6 +453,7 @@ class SettingsPage(QWidget):
         self._lay.addWidget(self._card_filter_tuning())
         self._lay.addWidget(self._card_pot_invert())
         self._lay.addWidget(self._card_auto_switch())
+        self._lay.addWidget(self._card_game_apps())
         self._lay.addWidget(self._card_appearance())
         self._lay.addWidget(self._card_autostart())
         self._lay.addWidget(self._card_tray())
@@ -681,6 +682,72 @@ class SettingsPage(QWidget):
         if self._profile_mgr is not None:
             self._profile_mgr.set_rules(self._settings.auto_switch_rules)
         self._reload_rules()
+
+    def _card_game_apps(self) -> QFrame:
+        """Lista procesów oznaczonych jako gry (dla PotAction.GAME_VOLUME)."""
+        card, cl = self._card("Gry", "gamepad")
+        cl.addWidget(QLabel(
+            "Dodaj nazwy procesów gier. Potencjometr z akcją „Gra (auto)„ "
+            "automatycznie wykryje która gra jest aktywna i steruje jej głośnością.",
+            objectName="sectionSubtitle"))
+        self._games_widget = QWidget()
+        self._games_lay = QVBoxLayout(self._games_widget)
+        self._games_lay.setContentsMargins(0, 0, 0, 0)
+        self._games_lay.setSpacing(6)
+        cl.addWidget(self._games_widget)
+
+        add_row = QHBoxLayout()
+        self._game_input = QLineEdit()
+        self._game_input.setPlaceholderText("np. cs2.exe, witcher3.exe")
+        game_add_btn = QPushButton("+ Dodaj")
+        game_add_btn.setCursor(Qt.PointingHandCursor)
+        game_add_btn.clicked.connect(self._add_game)
+        self._game_input.returnPressed.connect(self._add_game)
+        add_row.addWidget(self._game_input, stretch=1)
+        add_row.addWidget(game_add_btn)
+        cl.addLayout(add_row)
+
+        self._reload_games()
+        return card
+
+    def _reload_games(self) -> None:
+        while self._games_lay.count():
+            it = self._games_lay.takeAt(0)
+            w = it.widget()
+            if w is not None:
+                w.deleteLater()
+        for app in sorted(self._settings.game_apps):
+            row = QHBoxLayout()
+            row.setContentsMargins(0, 0, 0, 0)
+            row.addWidget(QLabel(f"🎮  {app}", objectName="sectionSubtitle"))
+            btn = QPushButton("✕")
+            btn.setFixedSize(26, 26)
+            btn.setCursor(Qt.PointingHandCursor)
+            btn.clicked.connect(lambda _=False, a=app: self._remove_game(a))
+            row.addWidget(btn)
+            row.addStretch()
+            container = QWidget()
+            container.setLayout(row)
+            self._games_lay.addWidget(container)
+
+    def _add_game(self) -> None:
+        name = self._game_input.text().strip().lower()
+        if not name:
+            return
+        if name not in self._settings.game_apps:
+            self._settings.game_apps.append(name)
+            self._save_settings()
+        self._game_input.clear()
+        self._reload_games()
+        self._notify("success", f"Dodano grę: {name}")
+
+    def _remove_game(self, name: str) -> None:
+        try:
+            self._settings.game_apps.remove(name)
+        except ValueError:
+            pass
+        self._save_settings()
+        self._reload_games()
 
     def _card_appearance(self) -> QFrame:
         card, cl = self._card("Wygląd — akcent", "palette")

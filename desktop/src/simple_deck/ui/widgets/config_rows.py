@@ -139,21 +139,23 @@ class PotRow(_ConfigRow):
         self._action_combo = QComboBox()
         self._action_combo.addItem("Głośność systemowa", PotAction.SYSTEM_VOLUME)
         self._action_combo.addItem("Głośność aplikacji", PotAction.APP_VOLUME)
+        self._action_combo.addItem("Gra (auto-wykrywanie)", PotAction.GAME_VOLUME)
         self._action_combo.addItem("Wyłączony", PotAction.NONE)
         for i in range(self._action_combo.count()):
             if self._action_combo.itemData(i) == config.action:
                 self._action_combo.setCurrentIndex(i)
                 break
         self._action_combo.currentIndexChanged.connect(self._on_changed)
+        self._action_combo.currentIndexChanged.connect(self._update_field_visibility)
         self._add_field("Akcja", self._action_combo)
 
-        # Cel audio (edytowalny - dowolna nazwa procesu)
+        # Cel audio — AppPicker (widoczny tylko dla APP_VOLUME)
         self._app_picker = AppPicker(audio_backend=audio_backend,
                                       label="Źródło audio",
                                       recent_apps=recent)
         self._app_picker.set_target(config.target)
         self._app_picker.selection_changed.connect(lambda *_: self._on_changed())
-        self._add_field("Aplikacja", self._app_picker)
+        self._app_picker_wrapper = self._add_field_wrapped("Aplikacja", self._app_picker)
 
         # Czułość
         from PySide6.QtWidgets import QDoubleSpinBox
@@ -226,6 +228,9 @@ class PotRow(_ConfigRow):
 
         self._fields_layout.addWidget(self._adv_container)
 
+        # Init field visibility based on current action
+        self._update_field_visibility()
+
     def _mk_slider(self, initial: int):
         s = QSlider(Qt.Horizontal)
         s.setRange(0, 100)
@@ -251,6 +256,24 @@ class PotRow(_ConfigRow):
         self._advanced_visible = checked
         self._adv_container.setVisible(checked)
         self._adv_toggle.setText("Zaawansowane  ▴" if checked else "Zaawansowane  ▾")
+
+    def _add_field_wrapped(self, label: str, widget) -> QWidget:
+        """Dodaj pole zwracając wrapper widget (do ukrywania/pokazywania)."""
+        wrapper = QWidget()
+        wrapper.setStyleSheet("background: transparent;")
+        row = QHBoxLayout(wrapper)
+        row.setContentsMargins(0, 0, 0, 0)
+        lbl = QLabel(label.upper(), objectName="labelMuted")
+        lbl.setFixedWidth(140)
+        row.addWidget(lbl)
+        row.addWidget(widget, stretch=1)
+        self._fields_layout.addWidget(wrapper)
+        return wrapper
+
+    def _update_field_visibility(self) -> None:
+        """Pokaż/ukryj pola zależnie od wybranej akcji."""
+        action = self._action_combo.currentData()
+        self._app_picker_wrapper.setVisible(action == PotAction.APP_VOLUME)
 
     def _on_changed(self, *_args) -> None:
         lo = self._min_slider.value() / 100.0
