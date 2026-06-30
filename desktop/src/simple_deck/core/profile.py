@@ -32,6 +32,7 @@ class ButtonAction(str, Enum):
     HOTKEY = "hotkey"                   # symulacja sekwencji klawiszy
     TOGGLE_MUTE = "toggle_mute"         # mute audio system/app
     RUN_COMMAND = "run_command"
+    PASTE_TEXT = "paste_text"           # wklej tekst (schowek + Ctrl+V)
 
 
 class LedMode(int, Enum):

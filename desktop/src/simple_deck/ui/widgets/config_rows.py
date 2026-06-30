@@ -320,6 +320,7 @@ class ButtonRow(_ConfigRow):
         self._action_combo.addItem("Skrót klawiszowy", ButtonAction.HOTKEY)
         self._action_combo.addItem("Wycisz / Odcisz", ButtonAction.TOGGLE_MUTE)
         self._action_combo.addItem("Uruchom komendę", ButtonAction.RUN_COMMAND)
+        self._action_combo.addItem("Wklej tekst", ButtonAction.PASTE_TEXT)
         self._action_combo.addItem("Brak", ButtonAction.NONE)
         for i in range(self._action_combo.count()):
             if self._action_combo.itemData(i) == config.action:
@@ -343,6 +344,18 @@ class ButtonRow(_ConfigRow):
             "border-radius: 8px; padding: 6px;")
         self._command_field.textChanged.connect(lambda *_: self._on_changed())
         self._command_row = self._add_field_wrapped("Komenda", self._command_field)
+
+        # Pole tekstu do wklejenia (widoczne tylko dla PASTE_TEXT)
+        from PySide6.QtWidgets import QPlainTextEdit
+        self._paste_field = QPlainTextEdit()
+        self._paste_field.setPlaceholderText("Tekst który zostanie wklejony...")
+        self._paste_field.setFixedHeight(80)
+        self._paste_field.setStyleSheet(
+            "background: rgba(40,44,64,220); border: 1px solid rgba(255,255,255,18);"
+            "border-radius: 8px; padding: 6px;")
+        self._paste_field.setPlainText(config.target if config.action == ButtonAction.PASTE_TEXT else "")
+        self._paste_field.textChanged.connect(lambda *_: self._on_changed())
+        self._paste_row = self._add_field_wrapped("Tekst", self._paste_field)
 
         # Cel wyciszenia (widoczny tylko dla TOGGLE_MUTE)
         self._mute_target = QLineEdit()
@@ -399,6 +412,7 @@ class ButtonRow(_ConfigRow):
         self._hotkey_row.setVisible(action == ButtonAction.HOTKEY)
         self._command_row.setVisible(action == ButtonAction.RUN_COMMAND)
         self._mute_row.setVisible(action == ButtonAction.TOGGLE_MUTE)
+        self._paste_row.setVisible(action == ButtonAction.PASTE_TEXT)
 
     def _on_changed(self, *_args) -> None:
         action = self._action_combo.currentData()
@@ -407,6 +421,8 @@ class ButtonRow(_ConfigRow):
             target = self._command_field.text()
         elif action == ButtonAction.TOGGLE_MUTE:
             target = self._mute_target.text()
+        elif action == ButtonAction.PASTE_TEXT:
+            target = self._paste_field.toPlainText()
         cfg = ButtonConfig(
             idx=self._config.idx,
             action=action,
