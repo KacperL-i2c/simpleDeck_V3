@@ -57,7 +57,7 @@ $outputDir  = Join-Path $here "output"
 $venv       = Join-Path $desktop ".venv-build"
 
 # Wersja aplikacji - czytana z pyproject.toml (do nazw plików .exe/.msi i -d AppVersion)
-$appVersion = "1.1.0"
+$appVersion = "1.1.1"
 $projFile   = Join-Path $desktop "pyproject.toml"
 if (Test-Path $projFile) {
     foreach ($line in (Get-Content $projFile)) {
