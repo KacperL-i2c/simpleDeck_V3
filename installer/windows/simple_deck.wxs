@@ -45,7 +45,7 @@
     candle/wix bez -d też zadziała - użyje domyślnej.
   -->
   <?ifndef var.AppVersion ?>
-  <?define AppVersion = "1.2.0" ?>
+  <?define AppVersion = "1.2.1" ?>
   <?endif?>
 
   <Product
