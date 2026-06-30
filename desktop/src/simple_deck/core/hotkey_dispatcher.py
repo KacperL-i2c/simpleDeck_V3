@@ -144,6 +144,9 @@ class HotkeyDispatcher(QObject):
                 import time
                 time.sleep(0.05)
                 self._hotkey.simulate_combo("Ctrl+V")
+                if getattr(cfg, "paste_enter", False):
+                    time.sleep(0.05)
+                    self._hotkey.simulate_combo("Enter")
                 return True
             except Exception:
                 log.exception("paste_text failed")

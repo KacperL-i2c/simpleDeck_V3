@@ -86,8 +86,9 @@ class ButtonConfig:
     idx: int = 0
     action: ButtonAction = ButtonAction.HOTKEY
     hotkey: str = ""           # np. "Ctrl+Shift+D", "MediaPlay"
-    target: str = ""           # dla APP_VOLUME / TOGGLE_MUTE
+    target: str = ""           # dla APP_VOLUME / TOGGLE_MUTE / PASTE_TEXT
     on_press: bool = True      # True = reaguj na wciśnięcie, False = na puszczenie
+    paste_enter: bool = False  # PASTE_TEXT: naciśnij Enter po wklejeniu
 
 
 # --- Cały profil ---
@@ -172,6 +173,7 @@ class Profile:
             hotkey=b.get("hotkey", ""),
             target=b.get("target", ""),
             on_press=b.get("on_press", True),
+            paste_enter=b.get("paste_enter", False),
         ) for i, b in enumerate(d.get("buttons", []))]
         # V2: stare profile (schema < 2) miały pole "leds" — ignorujemy je (cicha migracja).
         # V3: nowe pola led_mode/led_brightness/led_speed_ms/led_per_led.

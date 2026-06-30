@@ -357,6 +357,12 @@ class ButtonRow(_ConfigRow):
         self._paste_field.textChanged.connect(lambda *_: self._on_changed())
         self._paste_row = self._add_field_wrapped("Tekst", self._paste_field)
 
+        # Enter po wklejeniu (widoczne tylko dla PASTE_TEXT)
+        self._paste_enter = QCheckBox("Naciśnij Enter po wklejeniu")
+        self._paste_enter.setChecked(bool(getattr(config, "paste_enter", False)))
+        self._paste_enter.toggled.connect(lambda *_: self._on_changed())
+        self._paste_enter_row = self._add_field_wrapped("Enter", self._paste_enter)
+
         # Cel wyciszenia (widoczny tylko dla TOGGLE_MUTE)
         self._mute_target = QLineEdit()
         self._mute_target.setPlaceholderText("np. firefox (puste = system)")
@@ -413,6 +419,7 @@ class ButtonRow(_ConfigRow):
         self._command_row.setVisible(action == ButtonAction.RUN_COMMAND)
         self._mute_row.setVisible(action == ButtonAction.TOGGLE_MUTE)
         self._paste_row.setVisible(action == ButtonAction.PASTE_TEXT)
+        self._paste_enter_row.setVisible(action == ButtonAction.PASTE_TEXT)
 
     def _on_changed(self, *_args) -> None:
         action = self._action_combo.currentData()
@@ -429,6 +436,7 @@ class ButtonRow(_ConfigRow):
             hotkey=self._hotkey_field.value(),
             target=target,
             on_press=self._on_press.isChecked(),
+            paste_enter=self._paste_enter.isChecked() if action == ButtonAction.PASTE_TEXT else False,
         )
         self._config = cfg
         self.changed.emit(cfg.idx, cfg)
