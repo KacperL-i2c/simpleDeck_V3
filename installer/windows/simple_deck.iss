@@ -11,7 +11,7 @@
 ; ============================================================================
 
 #define MyAppName           "Simple Deck"
-#define MyAppVersion        "1.1.1"
+#define MyAppVersion        "1.2.0"
 #define MyAppPublisher      "GREJEM INDUSTRIES"
 #define MyAppURL            "https://github.com/grejem-industries/grejem-os"
 #define MyAppExeName        "Simple-Deck.exe"
