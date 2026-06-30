@@ -79,9 +79,10 @@ class ToastHost(QWidget):
     Subskrybuje ``bus.notify``.
     """
 
-    def __init__(self, bus, window: QWidget, parent=None):
+    def __init__(self, bus, window: QWidget, settings=None, parent=None):
         super().__init__(parent)
         self._window = window
+        self._settings = settings
         self.setAttribute(Qt.WA_TransparentForMouseEvents, False)
         self.setAttribute(Qt.WA_TranslucentBackground, True)
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.Tool | Qt.WindowStaysOnTopHint)
@@ -99,6 +100,8 @@ class ToastHost(QWidget):
         self._follow()
 
     def show_toast(self, level: str, message: str) -> None:
+        if self._settings is not None and not getattr(self._settings, "notifications_enabled", True):
+            return
         toast = Toast(level, message, parent=self)
         # Wstaw przed stretch'em (na dole listy - kolejność top-down)
         lay = self.layout()

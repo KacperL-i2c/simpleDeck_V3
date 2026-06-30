@@ -153,7 +153,7 @@ class MainWindow(QMainWindow):
         self.apply_accent(self._accent)
 
         # Toast host - nietrwałe powiadomienia
-        self._toast_host = ToastHost(self._bus, self, parent=self)
+        self._toast_host = ToastHost(self._bus, self, settings=self._settings, parent=self)
         self._toast_host.show()
 
         # Drop shadows dla headera/sidebar (V6: tylko te, nie karty)
