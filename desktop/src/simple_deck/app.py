@@ -39,7 +39,7 @@ log = logging.getLogger(__name__)
 def configure_logging(verbose: bool = False) -> None:
     """Konfiguruje logowanie do konsoli (i pliku w ~/.config/simple-deck/)."""
     level = logging.DEBUG if verbose else logging.INFO
-    fmt = "%(asctime)s [%(levelname)5.5s] %(name)-22.22s │ %(message)s"
+    fmt = "%(asctime)s [%(levelname)5.5s] %(name)-22.22s | %(message)s"
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(logging.Formatter(fmt, datefmt="%H:%M:%S"))
     root = logging.getLogger()
@@ -176,14 +176,22 @@ def wire_application(app: QApplication, demo_mode: bool = False,
     # 4. Routing ramek: Connection → EventBus
     connection.frame_received.connect(bus.route)
 
-    # 5. Profile manager - wczytaj / utwórz domyślny
-    profile_mgr = ProfileManager(parent=app)
-    profile_mgr.ensure_default()
-    profile = profile_mgr.active
-
-    # 5b. Globalne ustawienia aplikacji (settings.json)
+    # 5b. Globalne ustawienia aplikacji (settings.json) — wczytaj PRZED profilem
     settings = Settings()
     settings.load()
+
+    # Zastosuj wybrane urządzenie audio (jeśli ustawione)
+    if hasattr(audio_backend, "set_output_device"):
+        audio_backend.set_output_device(getattr(settings, "audio_output_device", ""))
+    # 5. Profile manager - utwórz default jeśli brak, załaduj ostatnio używany
+    profile_mgr = ProfileManager(parent=app)
+    profile_mgr.ensure_default()
+    # Wczytaj ostatnio używany profil (z zapisanych ustawień)
+    saved_profile = getattr(settings, "active_profile", "Default")
+    if saved_profile and saved_profile in profile_mgr.list_profiles():
+        profile_mgr.load(saved_profile)
+    profile = profile_mgr.active
+
     # Zastosuj reguły auto-przełączania z ustawień do ProfileManager'a
     for proc, prof in settings.auto_switch_rules.items():
         profile_mgr.set_rule(proc, prof)
@@ -268,6 +276,13 @@ def wire_application(app: QApplication, demo_mode: bool = False,
         pot_disp.set_profile(new_profile)
         led_disp.set_profile(new_profile)
         window.set_profile(new_profile)
+        # Zapamiętaj profil dla następnego uruchomienia
+        settings.active_profile = new_profile.name
+        try:
+            from .core.settings import settings_path
+            settings.to_json(settings_path())
+        except Exception:
+            log.exception("failed to save active_profile")
     profile_mgr.active_profile_changed.connect(_on_profile_changed)
 
     # 9b. V7: Throttle sub-systemów gdy okno ukryte (tray / minimize).
@@ -299,6 +314,11 @@ def wire_application(app: QApplication, demo_mode: bool = False,
             pot_disp._flush_persist()
         except Exception:
             log.exception("pot_disp._flush_persist() failed")
+        try:
+            from .core.settings import settings_path
+            s.to_json(settings_path())
+        except Exception:
+            log.exception("settings flush failed in _cleanup")
         try:
             window_det.stop()
         except Exception:

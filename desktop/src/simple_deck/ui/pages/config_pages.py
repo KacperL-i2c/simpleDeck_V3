@@ -931,15 +931,16 @@ class SettingsPage(QWidget):
         name = self._device_combo.itemData(idx) or ""
         self._settings.audio_output_device = name
         self._save_settings()
-        if name and self._audio is not None:
-            ok = self._audio.set_default_output(name)
-            self._notify("success" if ok else "warning",
-                         "Urządzenie zmienione" if ok else
-                         "Nie udało się ustawić urządzenia (nieobsługiwane?)")
+        if self._audio is not None:
+            if hasattr(self._audio, "set_output_device"):
+                self._audio.set_output_device(name)
+                self._notify("success", "Urządzenie audio zmienione")
+            elif name:
+                self._notify("warning", "Zmiana urządzenia nie jest obsługiwana na tej platformie")
 
     def _card_about(self) -> QFrame:
         card, cl = self._card("O aplikacji", "home")
-        cl.addWidget(QLabel("Simple Deck  ·  v1.0.0", objectName="labelLarge"))
+        cl.addWidget(QLabel("Simple Deck  ·  v1.2.1", objectName="labelLarge"))
         cl.addWidget(QLabel("by GREJEM INDUSTRIES", objectName="sectionSubtitle"))
         line = QFrame(objectName="hLine")
         cl.addWidget(line)

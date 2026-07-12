@@ -93,15 +93,16 @@ class WindowsAudioBackend(AudioBackend):
         from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
         self._AudioUtilities = AudioUtilities
         self._CLSCTX_ALL = CLSCTX_ALL
-        # IID interfejsu IAudioEndpointVolume - potrzebne do IMMDevice.Activate().
-        # Bez tego (B2 - bug): Activate(CLSCTX_ALL, None) → COM error, audio martwe.
         self._volume_iid = IAudioEndpointVolume._iid_
-        # Cache sesji per-target (key=target_lower → AudioSession). Inwalidowany
-        # gdy nie znaleziony lub po TTL. Eliminuje GetAllSessions() na każdym
-        # set_volume (30 Hz pot wiggle → dawniej 30 RPC/s).
         self._session_cache: dict[str, object] = {}
         self._session_cache_at: dict[str, float] = {}
-        self._session_ttl = 5.0  # sekundy
+        self._session_ttl = 5.0
+        # Wybrane urządzenie wyjściowe (puste = domyślne systemowe)
+        self._device_name: str = ""
+
+    def set_output_device(self, name: str) -> None:
+        """Ustaw urządzenie wyjściowe do sterowania głośnością systemową."""
+        self._device_name = name or ""
 
     def list_apps(self) -> list[str]:
         try:
@@ -141,7 +142,12 @@ class WindowsAudioBackend(AudioBackend):
         return None
 
     def _get_master(self):
-        """Zwraca interfejs IAudioEndpointVolume dla domyślnego urządzenia wyjściowego."""
+        """Zwraca IAudioEndpointVolume dla wybranego (lub domyślnego) urządzenia."""
+        if self._device_name:
+            for d in self._AudioUtilities.GetAllDevices():
+                if str(getattr(d, "DataFlow", "")).lower().startswith("render"):
+                    if d.name == self._device_name:
+                        return d.EndpointVolume
         devices = self._AudioUtilities.GetSpeakers()
         return devices.EndpointVolume
 

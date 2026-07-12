@@ -103,6 +103,8 @@ class Settings:
     minimize_to_tray_on_close: bool = False
     # Powiadomienia toast (info/success/warning/error)
     notifications_enabled: bool = True
+    # Ostatnio używany profil (ładowany przy starcie)
+    active_profile: str = "Default"
     # Lista procesów oznaczonych jako gry (dla PotAction.GAME_VOLUME).
     # Nazwy lowercase, np. ["cs2.exe", "witcher3.exe"].
     game_apps: list[str] = field(default_factory=list)
@@ -120,6 +122,7 @@ class Settings:
             "show_tray_icon": bool(self.show_tray_icon),
             "minimize_to_tray_on_close": bool(self.minimize_to_tray_on_close),
             "notifications_enabled": bool(self.notifications_enabled),
+            "active_profile": str(self.active_profile),
             "game_apps": [str(a).lower() for a in self.game_apps],
         }
 
@@ -157,6 +160,7 @@ class Settings:
             show_tray_icon=bool(d.get("show_tray_icon", False)),
             minimize_to_tray_on_close=bool(d.get("minimize_to_tray_on_close", False)),
             notifications_enabled=bool(d.get("notifications_enabled", True)),
+            active_profile=str(d.get("active_profile", "Default")),
             game_apps=[str(a).lower() for a in (d.get("game_apps") or [])],
         )
 

@@ -464,11 +464,14 @@ class MainWindow(QMainWindow):
                 and getattr(self._settings, "minimize_to_tray_on_close", False)
                 and getattr(self._settings, "show_tray_icon", False)):
             log.info("MainWindow closeEvent — minimize to tray")
+            # Flush settings before hiding (debounced saves might be pending)
+            self._flush_settings()
             event.ignore()
             self.hide()
             return
 
         log.info("MainWindow closeEvent - cleanup")
+        self._flush_settings()
         # Flush wszystkich debounced zapisów profilu (V6: lazy pages mogą być None)
         for page in (self._page_pots, self._page_buttons):
             if page is not None and hasattr(page, "_flush_save"):
@@ -482,3 +485,17 @@ class MainWindow(QMainWindow):
         except Exception:
             log.exception("connection.stop() failed during closeEvent")
         super().closeEvent(event)
+
+    def _flush_settings(self):
+        """Flush debounced settings + profile saves."""
+        for page in (self._page_pots, self._page_buttons):
+            if page is not None and hasattr(page, "_flush_save"):
+                page._flush_save()
+        if self._page_settings is not None and hasattr(self._page_settings, "_flush_save"):
+            self._page_settings._flush_save()
+        if self._settings is not None:
+            try:
+                from ..core.settings import settings_path
+                self._settings.to_json(settings_path())
+            except Exception:
+                log.exception("settings flush failed")
