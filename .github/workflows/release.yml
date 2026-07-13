@@ -60,7 +60,14 @@ jobs:
       - name: Install WiX v4
         shell: pwsh
         run: |
-          dotnet tool install -g wix
+          # Pin do v4 - v5+ usunela subkomende `heat`, ktorej uzywa build.ps1.
+          # `uninstall` ignorujemy jesli nie zainstalowane; `install --version 4.*`
+          # pobiera najnowszego v4.x (floating, zapobiega regressji przy nowszych v5).
+          & dotnet tool uninstall -g wix 2>$null
+          & dotnet tool install -g wix --version "4.*"
+          if ($LASTEXITCODE -ne 0) {
+            throw "Nie udalo sie zainstalowac WiX v4 (potrzebny dla subkomendy 'heat' w build.ps1)."
+          }
           # .dotnet\tools jest zazwyczaj juz w PATH na windows-latest
           echo "$env:USERPROFILE\.dotnet\tools" >> $env:GITHUB_PATH
 
