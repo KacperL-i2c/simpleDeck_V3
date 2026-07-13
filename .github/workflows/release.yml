@@ -31,6 +31,11 @@ on:
         type: boolean
         required: false
         default: false
+      build_msi:
+        description: 'Buduj tez .msi (WiX) - domyslnie POMINIETE (WiX v5 nie kompatybilne z build.ps1)'
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: write   # wymagane przez gh release create / upload
@@ -58,11 +63,13 @@ jobs:
           echo "C:\Program Files (x86)\Inno Setup 6" >> $env:GITHUB_PATH
 
       - name: Install WiX v4
+        if: github.event_name == 'workflow_dispatch' && inputs.build_msi == true
         shell: pwsh
         run: |
           # Pin do v4.0.5 - v5+ usunela subkomende 'heat', ktorej uzywa build.ps1.
-          # UWAGA: `dotnet tool install --version` wymaga DOKLADNEJ wersji
-          # (wildcardy typu "4.*" dzialaja tylko z `update`, nie z `install`).
+          # UWAGA: ten krok jest conditional - domyslnie pomijamy .msi (build_msi=false).
+          # TODO(v1.4.0): zaktualizowac build.ps1 pod WiX v5 (heat -> nowa skladnia)
+          # i przywrocic MSI jako default.
           & dotnet tool uninstall -g wix 2>$null
           & dotnet tool install -g wix --version 4.0.5
           if ($LASTEXITCODE -ne 0) {
@@ -96,7 +103,16 @@ jobs:
         shell: pwsh
         run: |
           Set-Location installer\windows
-          .\build.ps1
+          # MSI wymaga WiX v4 (v5+ usunelo 'heat'); domyslnie pomijamy .msi.
+          # Uzytkownik moze wlaczyc build_msi=true przy workflow_dispatch.
+          $buildArgs = @()
+          if (-not ("${{ inputs.build_msi }}" -eq "true")) {
+            $buildArgs += "-SkipMsi"
+            Write-Host "Pomijam .msi (build_msi=false). Buduje tylko Inno Setup .exe."
+          } else {
+            Write-Host "Buduje oba formaty (.exe + .msi) - uwaga: wymaga WiX v4."
+          }
+          & .\build.ps1 @buildArgs
 
       - name: Verify artifacts
         shell: pwsh
