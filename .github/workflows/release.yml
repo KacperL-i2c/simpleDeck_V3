@@ -103,16 +103,15 @@ jobs:
         shell: pwsh
         run: |
           Set-Location installer\windows
+          # Bezposrednie wywolanie (NIE array splat - PS nie binduje switchy przez @arr).
           # MSI wymaga WiX v4 (v5+ usunelo 'heat'); domyslnie pomijamy .msi.
-          # Uzytkownik moze wlaczyc build_msi=true przy workflow_dispatch.
-          $buildArgs = @()
-          if (-not ("${{ inputs.build_msi }}" -eq "true")) {
-            $buildArgs += "-SkipMsi"
-            Write-Host "Pomijam .msi (build_msi=false). Buduje tylko Inno Setup .exe."
+          if ("${{ inputs.build_msi }}" -eq "true") {
+            Write-Host "Buduje oba formaty (.exe + .msi) - wymaga WiX v4."
+            & .\build.ps1
           } else {
-            Write-Host "Buduje oba formaty (.exe + .msi) - uwaga: wymaga WiX v4."
+            Write-Host "Pomijam .msi (build_msi=false). Buduje tylko Inno Setup .exe."
+            & .\build.ps1 -SkipMsi
           }
-          & .\build.ps1 @buildArgs
 
       - name: Verify artifacts
         shell: pwsh
