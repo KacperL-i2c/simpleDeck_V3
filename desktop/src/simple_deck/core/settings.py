@@ -219,3 +219,6 @@ class Settings:
         self.last_pot_values = other.last_pot_values
         self.show_tray_icon = other.show_tray_icon
         self.minimize_to_tray_on_close = other.minimize_to_tray_on_close
+        self.notifications_enabled = other.notifications_enabled
+        self.active_profile = other.active_profile
+        self.game_apps = other.game_apps

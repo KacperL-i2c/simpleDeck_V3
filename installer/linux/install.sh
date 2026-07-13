@@ -33,7 +33,7 @@ APP_NAME="Simple Deck"
 APP_PRETTY="Simple Deck"
 APP_SLUG="simple-deck"
 APP_VENDOR="GREJEM INDUSTRIES"
-VERSION="1.0.0"
+VERSION="1.3.1"
 
 # Ścieżki z XDG (z fallback do ~/.local)
 XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"

@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QFrame,
                                 QProgressBar, QPushButton, QScrollArea, QSlider,
                                 QVBoxLayout, QWidget)
 
+from ... import __version__
 from ...core.event_bus import EventBus
 from ...core.profile import (ButtonConfig, PotConfig,
                               Profile)
@@ -940,7 +941,7 @@ class SettingsPage(QWidget):
 
     def _card_about(self) -> QFrame:
         card, cl = self._card("O aplikacji", "home")
-        cl.addWidget(QLabel("Simple Deck  ·  v1.2.1", objectName="labelLarge"))
+        cl.addWidget(QLabel(f"Simple Deck  ·  v{__version__}", objectName="labelLarge"))
         cl.addWidget(QLabel("by GREJEM INDUSTRIES", objectName="sectionSubtitle"))
         line = QFrame(objectName="hLine")
         cl.addWidget(line)

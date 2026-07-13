@@ -23,9 +23,14 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Wersja do zbudowania (bez prefixu v, np. 1.0.0)'
+        description: 'Wersja do zbudowania (bez prefixu v, np. 1.3.1)'
         required: true
-        default: '1.0.0'
+        default: '1.3.1'
+      prerelease:
+        description: 'Oznacz release jako pre-release (beta)'
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: write   # wymagane przez gh release create / upload
@@ -132,9 +137,21 @@ jobs:
             gh release upload $tag $assets --clobber
           } else {
             Write-Host "Tworze nowy release $tag."
-            gh release create $tag $assets `
-              --title $title `
-              --generate-notes
+            $preFlag = ""
+            if ("${{ inputs.prerelease }}" -eq "true") {
+              $preFlag = "--prerelease"
+              Write-Host "  (oznaczony jako PRE-RELEASE)"
+            }
+            if ($preFlag) {
+              gh release create $tag $assets `
+                --title $title `
+                --prerelease `
+                --generate-notes
+            } else {
+              gh release create $tag $assets `
+                --title $title `
+                --generate-notes
+            }
           }
 
           # Wyswietl URL

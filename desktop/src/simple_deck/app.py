@@ -21,6 +21,7 @@ from typing import Optional
 from PySide6.QtGui import QColor, QFontDatabase, QPalette
 from PySide6.QtWidgets import QApplication
 
+from . import __version__
 from .core.event_bus import EventBus
 from .core.hotkey_dispatcher import HotkeyDispatcher
 from .core.led_dispatcher import LedDispatcher
@@ -145,7 +146,7 @@ def create_app(argv: Optional[list[str]] = None) -> QApplication:
     app.setApplicationName("Simple Deck")
     app.setApplicationDisplayName("Simple Deck")
     app.setOrganizationName("GREJEM INDUSTRIES")
-    app.setApplicationVersion("1.0.0")
+    app.setApplicationVersion(__version__)
     return app
 
 
@@ -316,7 +317,7 @@ def wire_application(app: QApplication, demo_mode: bool = False,
             log.exception("pot_disp._flush_persist() failed")
         try:
             from .core.settings import settings_path
-            s.to_json(settings_path())
+            settings.to_json(settings_path())
         except Exception:
             log.exception("settings flush failed in _cleanup")
         try:
