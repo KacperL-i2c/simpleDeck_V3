@@ -207,14 +207,20 @@ if ($LASTEXITCODE -ne 0) { throw "pyinstaller install failed" }
 # ============================================================
 Write-Step "Krok 3/6: PyInstaller build (simple_deck.spec)"
 Push-Location $here
+# PS 5.1 (localhost) traktuje stderr native command jako terminating error przy
+# ErrorActionPreference=Stop. PS 7 (CI) nie ma tego problemu. Continue + $LASTEXITCODE
+# to kanoniczny pattern dzialajacy w obu wersjach.
+$prevEAP = $ErrorActionPreference
+$ErrorActionPreference = 'Continue'
 try {
     & $python -m PyInstaller $pySpec `
         --noconfirm `
         --clean `
         --distpath "$here\dist" `
-        --workpath "$here\build"
-    if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed" }
+        --workpath "$here\build" 2>&1
+    if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed (exit $LASTEXITCODE)" }
 } finally {
+    $ErrorActionPreference = $prevEAP
     Pop-Location
 }
 $appDist = Join-Path $here "dist\Simple-Deck"
@@ -244,7 +250,7 @@ if (-not $SkipExe) {
         Write-Warning "  Pobierz z: https://jrsoftware.org/isdl.php"
     } else {
         Write-Host "  ISCC: $iscc"
-        & $iscc /Q $innoScript
+        & $iscc /Q /dMyAppVersion=$appVersion $innoScript
         if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed" }
     }
 } else {

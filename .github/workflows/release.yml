@@ -1,18 +1,21 @@
 # ============================================================================
 #  Simple Deck - Release CI
 #  ----------------------------------------------------------------------------
-#  Buduje instalatory (.exe + .msi) na Windows runner i tworzy GitHub Release.
+#  Buduje instalator .exe (Inno Setup) na Windows runner i tworzy GitHub Release.
 #
 #  Wyzwalacze:
-#    1. Push tagu v* (np. v1.0.0)  -> automatyczny build + release
+#    1. Push tagu v* (np. v1.3.1)  -> automatyczny build + release
 #    2. workflow_dispatch           -> manualny build podanej wersji
+#
+#  Historia MSI: build.ps1 probowal budowac tez .msi przez WiX Toolset,
+#  ale WiX v4+ usunelo subkomende 'heat' z CLI (celowe - monetyzacja przez
+#  HeatWave Build Tools). MSI wymagaloby rekompilacji build.ps1 pod nowa
+#  skladnie WiX v5+ lub recznego authoring .wxs. Na potrzeby desktop app
+#  Inno Setup .exe jest w zupelnej wystarczalnosci.
 #
 #  Interakcja z lokalnym CLI (scripts/release.py):
 #    - Lokalny release.py (--ci) pushuje TYLKO tag; ten workflow buduje
 #      i tworzy release w chmurze.
-#    - Lokalny release.py (bez --ci) buduje lokalnie i tworzy release sam;
-#      ten workflow wykrywa istniejacy release i tylko re-uploaduje artefakty
-#      (CI-built, --clobber zastapi lokalne).
 # ============================================================================
 name: Release
 
@@ -28,11 +31,6 @@ on:
         default: '1.3.1'
       prerelease:
         description: 'Oznacz release jako pre-release (beta)'
-        type: boolean
-        required: false
-        default: false
-      build_msi:
-        description: 'Buduj tez .msi (WiX) - domyslnie POMINIETE (WiX v5 nie kompatybilne z build.ps1)'
         type: boolean
         required: false
         default: false
@@ -59,31 +57,7 @@ jobs:
           # 'upgrade' is idempotent: installs if missing, no-op if newer present.
           # windows-latest image ships InnoSetup preinstalled (currently 6.7.1).
           choco upgrade innosetup -y --no-progress
-          # Dodaj do PATH na wszelki wypadek
           echo "C:\Program Files (x86)\Inno Setup 6" >> $env:GITHUB_PATH
-
-      - name: Install WiX v4
-        if: github.event_name == 'workflow_dispatch' && inputs.build_msi == true
-        shell: pwsh
-        run: |
-          # Pin do v4.0.5 - v5+ usunela subkomende 'heat', ktorej uzywa build.ps1.
-          # UWAGA: ten krok jest conditional - domyslnie pomijamy .msi (build_msi=false).
-          # TODO(v1.4.0): zaktualizowac build.ps1 pod WiX v5 (heat -> nowa skladnia)
-          # i przywrocic MSI jako default.
-          & dotnet tool uninstall -g wix 2>$null
-          & dotnet tool install -g wix --version 4.0.5
-          if ($LASTEXITCODE -ne 0) {
-            throw "WiX v4.0.5 install failed (exit $LASTEXITCODE)"
-          }
-          # Sanity: wix.exe --version musi zaczynac sie od '4.'
-          $wixExe = Join-Path $env:USERPROFILE ".dotnet\tools\wix.exe"
-          $wv = & $wixExe --version 2>&1
-          Write-Host "Installed WiX version: $wv"
-          if (-not ("$wv" -match '^4\.')) {
-            throw "WiX v4 required, got: $wv. build.ps1 uzywa 'wix heat dir' niedostepnego w v5+."
-          }
-          # .dotnet\tools jest zazwyczaj juz w PATH na windows-latest
-          echo "$env:USERPROFILE\.dotnet\tools" >> $env:GITHUB_PATH
 
       - name: Resolve version
         id: ver
@@ -99,44 +73,24 @@ jobs:
           echo "version=$version" >> $env:GITHUB_OUTPUT
           echo "tag=v$version" >> $env:GITHUB_OUTPUT
 
-      - name: Build installers
+      - name: Build installer (.exe)
         shell: pwsh
         run: |
           Set-Location installer\windows
-          # Bezposrednie wywolanie (NIE array splat - PS nie binduje switchy przez @arr).
-          # MSI wymaga WiX v4 (v5+ usunelo 'heat'); domyslnie pomijamy .msi.
-          if ("${{ inputs.build_msi }}" -eq "true") {
-            Write-Host "Buduje oba formaty (.exe + .msi) - wymaga WiX v4."
-            & .\build.ps1
-          } else {
-            Write-Host "Pomijam .msi (build_msi=false). Buduje tylko Inno Setup .exe."
-            & .\build.ps1 -SkipMsi
-          }
+          # -SkipMsi: WiX v4+ nie ma 'heat' CLI; .msi wymagalby rekompilacji build.ps1.
+          # Inno Setup .exe jest wystarczajacy dla userskiego desktop app.
+          & .\build.ps1 -SkipMsi
 
       - name: Verify artifacts
         shell: pwsh
         run: |
           $v = "${{ steps.ver.outputs.version }}"
           $exe = "installer\windows\output\Simple-Deck-Setup-$v.exe"
-          $msi = "installer\windows\output\Simple-Deck-$v.msi"
-          $found = $false
-          if (Test-Path $exe) {
-            $sz = [math]::Round((Get-Item $exe).Length / 1MB, 1)
-            Write-Host "  .exe: $exe ($sz MB)"
-            $found = $true
-          } else {
-            Write-Warning "  .exe NOT FOUND: $exe"
+          if (-not (Test-Path $exe)) {
+            throw "Brak artefaktu: $exe"
           }
-          if (Test-Path $msi) {
-            $sz = [math]::Round((Get-Item $msi).Length / 1MB, 1)
-            Write-Host "  .msi: $msi ($sz MB)"
-            $found = $true
-          } else {
-            Write-Warning "  .msi NOT FOUND: $msi"
-          }
-          if (-not $found) {
-            throw "No installer artifacts found!"
-          }
+          $sz = [math]::Round((Get-Item $exe).Length / 1MB, 1)
+          Write-Host "OK: $exe ($sz MB)"
 
       - name: Create or update GitHub Release
         env:
@@ -146,13 +100,7 @@ jobs:
           $tag = "${{ steps.ver.outputs.tag }}"
           $v = "${{ steps.ver.outputs.version }}"
           $exe = "installer\windows\output\Simple-Deck-Setup-$v.exe"
-          $msi = "installer\windows\output\Simple-Deck-$v.msi"
           $title = "Simple Deck v$v"
-
-          # Zbuduj liste artefaktow (tylko istniejace)
-          $assets = @()
-          if (Test-Path $exe) { $assets += $exe }
-          if (Test-Path $msi) { $assets += $msi }
 
           # Czy release juz istnieje? (np. utworzony przez lokalny release.py)
           $existing = $false
@@ -163,7 +111,7 @@ jobs:
 
           if ($existing) {
             Write-Host "Release $tag juz istnieje - upload artefaktow (--clobber)."
-            gh release upload $tag $assets --clobber
+            gh release upload $tag $exe --clobber
           } else {
             Write-Host "Tworze nowy release $tag."
             $preFlag = ""
@@ -171,16 +119,10 @@ jobs:
               $preFlag = "--prerelease"
               Write-Host "  (oznaczony jako PRE-RELEASE)"
             }
-            if ($preFlag) {
-              gh release create $tag $assets `
-                --title $title `
-                --prerelease `
-                --generate-notes
-            } else {
-              gh release create $tag $assets `
-                --title $title `
-                --generate-notes
-            }
+            gh release create $tag $exe `
+              --title $title `
+              --generate-notes `
+              $preFlag
           }
 
           # Wyswietl URL
