@@ -114,15 +114,16 @@ jobs:
             gh release upload $tag $exe --clobber
           } else {
             Write-Host "Tworze nowy release $tag."
-            $preFlag = ""
+            # Argumenty budujemy jako tablica i warunkowo dolaczamy --prerelease.
+            # NIE wolno przekazywac pustego stringu jako argumentu (`$preFlag` "")
+            # - gh traktuje go jako pozycyjny arg i pada: "no matches found for ''".
+            $ghArgs = @("release", "create", $tag, $exe,
+                        "--title", $title, "--generate-notes")
             if ("${{ inputs.prerelease }}" -eq "true") {
-              $preFlag = "--prerelease"
+              $ghArgs += "--prerelease"
               Write-Host "  (oznaczony jako PRE-RELEASE)"
             }
-            gh release create $tag $exe `
-              --title $title `
-              --generate-notes `
-              $preFlag
+            gh @ghArgs
           }
 
           # Wyswietl URL
