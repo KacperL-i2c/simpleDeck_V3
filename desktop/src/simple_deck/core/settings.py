@@ -108,6 +108,9 @@ class Settings:
     # Lista procesów oznaczonych jako gry (dla PotAction.GAME_VOLUME).
     # Nazwy lowercase, np. ["cs2.exe", "witcher3.exe"].
     game_apps: list[str] = field(default_factory=list)
+    # Rozmiar okna głównego [w, h] — zapisywany przy zamknięciu, przywracany
+    # przy starcie (clamped do availableGeometry ekranu w MainWindow).
+    window_size: list[int] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return {
@@ -124,6 +127,7 @@ class Settings:
             "notifications_enabled": bool(self.notifications_enabled),
             "active_profile": str(self.active_profile),
             "game_apps": [str(a).lower() for a in self.game_apps],
+            "window_size": self._sanitized_window_size(),
         }
 
     @classmethod
@@ -162,7 +166,24 @@ class Settings:
             notifications_enabled=bool(d.get("notifications_enabled", True)),
             active_profile=str(d.get("active_profile", "Default")),
             game_apps=[str(a).lower() for a in (d.get("game_apps") or [])],
+            window_size=cls._parse_window_size(d.get("window_size")),
         )
+
+    @staticmethod
+    def _parse_window_size(raw) -> list[int]:
+        """[w, h] z JSON — odporne na śmieci (zwraca [] przy błędnych)."""
+        if not isinstance(raw, (list, tuple)) or len(raw) != 2:
+            return []
+        try:
+            w, h = int(raw[0]), int(raw[1])
+        except (TypeError, ValueError):
+            return []
+        if w < 200 or h < 200 or w > 16384 or h > 16384:
+            return []
+        return [w, h]
+
+    def _sanitized_window_size(self) -> list[int]:
+        return self._parse_window_size(self.window_size)
 
     def to_json(self, path: Path) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -222,3 +243,4 @@ class Settings:
         self.notifications_enabled = other.notifications_enabled
         self.active_profile = other.active_profile
         self.game_apps = other.game_apps
+        self.window_size = other.window_size

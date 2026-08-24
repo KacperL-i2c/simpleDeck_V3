@@ -89,6 +89,10 @@ def mock_connection(qapp):
 
     signals = _MockSignals()
     conn = MagicMock()
+    # Keeper: QObject bez parenta ginie z GC gdy lokalna referencja wyjdzie
+    # z fixture (bound-signal NIE trzyma źródła przy życiu) — wtedy każdy
+    # .connect() pada "Signal source has been deleted".
+    conn._signals_keeper = signals
     conn.state = ConnectionState.DISCONNECTED
     conn.state_changed = signals.state_changed
     conn.frame_received = signals.frame_received

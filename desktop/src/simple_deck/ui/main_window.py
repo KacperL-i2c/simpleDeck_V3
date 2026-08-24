@@ -95,8 +95,14 @@ class MainWindow(QMainWindow):
         # --- Window setup ---
         self.setWindowTitle("Simple Deck")
         self.setWindowFlags(Qt.Window | Qt.FramelessWindowHint)
-        self.resize(1280, 800)
-        self.setMinimumSize(1024, 640)
+        # V1.3.3: Niższe minimum — okno frameless musi dać się zmniejszyć na
+        # ekranach z DPI scaling 125-150% (efektywnie ~1280x620 miejsca).
+        self.setMinimumSize(820, 520)
+        self.resize(*self._initial_size(settings=self._settings,
+                                        screen=self.screen()))
+        # V1.3.3: Krawędzie okna reagują na mysz (resize) — mouse tracking dla
+        # fallbacku POSIX; na Windows resize obsługuje WM_NCHITTEST.
+        self.setMouseTracking(True)
 
         # --- Root widget ---
         root = QWidget(objectName="root")
@@ -403,8 +409,119 @@ class MainWindow(QMainWindow):
         # w _ensure_page().
 
     # ===================================================================
+    # Resize (V1.3.3) — frameless okno nie ma natywnych uchwytów rozmiaru
+    # ===================================================================
+    # Strefa przy krawędzi okna traktowana jako uchwyt resize (px).
+    RESIZE_MARGIN = 8
+
+    # Windows non-client hit-test codes (winuser.h)
+    _HT = {
+        Qt.LeftEdge: 10, Qt.RightEdge: 11, Qt.TopEdge: 12,
+        Qt.BottomEdge: 15,
+        Qt.LeftEdge | Qt.TopEdge: 13, Qt.RightEdge | Qt.TopEdge: 14,
+        Qt.LeftEdge | Qt.BottomEdge: 16, Qt.RightEdge | Qt.BottomEdge: 17,
+    }
+
+    @classmethod
+    def _initial_size(cls, settings=None, screen=None) -> tuple[int, int]:
+        """Rozmiar startowy: zapisany w settings (jeśli był) → clamp do ekranu.
+
+        Frameless okno bez natywnego WM musiało startować 1280x800, co na
+        ekranach z DPI scaling 125-150% (available ~1280x620) wystawało poza
+        ekran i — bez uchwytów resize — było nie do zmniejszenia. Teraz:
+        1) przywróć ``settings.window_size`` jeśli zapisany i sensowny,
+        2) obetnij do availableGeometry aktualnego ekranu.
+        """
+        w, h = 1280, 800
+        saved = getattr(settings, "window_size", None) \
+            if settings is not None else None
+        if isinstance(saved, (list, tuple)) and len(saved) == 2:
+            try:
+                sw, sh = int(saved[0]), int(saved[1])
+                if sw > 0 and sh > 0:
+                    w, h = sw, sh
+            except (TypeError, ValueError):
+                pass
+        if screen is not None:
+            avail = screen.availableGeometry()
+            w = min(w, avail.width() - 24)
+            h = min(h, avail.height() - 24)
+        return max(w, 200), max(h, 200)
+
+    def _edges_at(self, pos: QPoint) -> Qt.Edges:
+        """Krawędzie okna nakładające się na punkt ``pos`` (wsp. okna).
+
+        Punkt w lewym górnym rogu zwraca ``LeftEdge | TopEdge`` etc.;
+        środek okna zwraca 0 (brak).
+        """
+        m = self.RESIZE_MARGIN
+        edges = Qt.Edges()
+        if pos.x() < m:
+            edges |= Qt.LeftEdge
+        elif pos.x() >= self.width() - m:
+            edges |= Qt.RightEdge
+        if pos.y() < m:
+            edges |= Qt.TopEdge
+        elif pos.y() >= self.height() - m:
+            edges |= Qt.BottomEdge
+        return edges
+
+    def nativeEvent(self, eventType, message):
+        """Windows: WM_NCHITTEST — krawędzie okna jako strefy resize OS-a.
+
+        Natywny hit-test idzie do okna PRZED rozdzieleniem na child widgety,
+        więc działa nawet tam, gdzie Qt-owy fallback (mousePressEvent) nigdy
+        nie dostanie eventu (dzieci pochłaniają). Daje natywne kursory,
+        płynny resize i Aero Snap za darmo.
+        """
+        if eventType == "windows_generic_MSG":
+            try:
+                ht = self._nchittest(message)
+            except Exception:
+                ht = 0
+            if ht:
+                return True, ht
+        return super().nativeEvent(eventType, message)
+
+    def _nchittest(self, message) -> int:
+        """Zwróć HT* dla WM_NCHITTEST lub 0 (= default/HTCLIENT)."""
+        import ctypes
+        from ctypes import wintypes
+
+        class _MSG(ctypes.Structure):
+            _fields_ = [("hwnd", wintypes.HWND), ("message", wintypes.UINT),
+                        ("wParam", wintypes.WPARAM), ("lParam", wintypes.LPARAM),
+                        ("time", wintypes.DWORD), ("pt", wintypes.POINT),
+                        ("lPrivate", ctypes.c_uint)]
+
+        msg = _MSG.from_address(int(message))
+        WM_NCHITTEST = 0x0084
+        if msg.message != WM_NCHITTEST:
+            return 0
+        # lParam: podpisane 16-bit screen coords (multi-monitor: mogą być < 0)
+        x = ctypes.c_short(msg.lParam & 0xFFFF).value
+        y = ctypes.c_short((msg.lParam >> 16) & 0xFFFF).value
+        edges = self._edges_at(self.mapFromGlobal(QPoint(x, y)))
+        return self._HT.get(edges, 0)
+
+    # ===================================================================
     # Dragging fallback (dla Qt < 6.4 bez startSystemMove)
     # ===================================================================
+    def mousePressEvent(self, e):
+        # V1.3.3: Klik w strefę krawędzi → systemowy resize (fallback Linux/
+        # Wayland; na Windows robi to WM_NCHITTEST). Event dociera tutaj bo
+        # marginesy root-widgetu (18/14 px) ignorują mousePress i Qt
+        # propaguje je do QMainWindow.
+        if e.button() == Qt.LeftButton:
+            edges = self._edges_at(e.position().toPoint())
+            if edges:
+                wh = self.windowHandle()
+                if wh is not None and hasattr(wh, "startSystemResize"):
+                    wh.startSystemResize(edges)
+                    e.accept()
+                    return
+        super().mousePressEvent(e)
+
     def mouseMoveEvent(self, e):
         # Tylko fallback gdy startSystemMove niedostępny - ustawiono _drag_offset
         if self._drag_offset is not None and e.buttons() & Qt.LeftButton:
@@ -494,6 +611,9 @@ class MainWindow(QMainWindow):
         if self._page_settings is not None and hasattr(self._page_settings, "_flush_save"):
             self._page_settings._flush_save()
         if self._settings is not None:
+            # V1.3.3: Zapamiętaj rozmiar okna — przywrócony przy następnym
+            # starcie (clamped do ekranu w _initial_size).
+            self._settings.window_size = [self.width(), self.height()]
             try:
                 from ..core.settings import settings_path
                 self._settings.to_json(settings_path())

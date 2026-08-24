@@ -2,7 +2,7 @@
 
 > Handoff file for AI coding sessions. **Read this first.** It tells you what the
 > project is, what is already done, and what to work on next.
-> Last updated: 2026-08-24 (session 7 - V8 / v1.3.2: panel Gry Zapisz, WiX .msi fix).
+> Last updated: 2026-08-24 (session 8 - V9 / v1.3.3: resize okna frameless).
 
 ## 1. Project at a glance
 
@@ -109,6 +109,23 @@ Frame:  SOF(0xA5) | TYPE | CH | LEN | PAYLOAD[0..32] | CRC16-LO | CRC16-HI
     UpgradeCode) — mogą współistnieć bez konfliktu. `build.ps1` buduje oba.
 
 ## 6. DONE (v1.0 → V2)
+
+**Sesja 8 (V9 / v1.3.3 — resize okna frameless):**
+- **Okno da się zmniejszać** (`ui/main_window.py`): frameless okno nie miało
+  uchwytów rozmiaru, a startowe 1280×800 przy min 1024×640 wystawało poza
+  ekran przy DPI scaling 125–150% (karta „Gry" z Zapisz była poza ekranem).
+  Teraz: **natywny resize krawędziami** — Windows przez `nativeEvent`
+  (WM_NCHITTEST → HT*; działa nad child-widgetami, daje natywne kursory +
+  Aero Snap), fallback POSIX `startSystemResize` w `mousePressEvent`
+  (dociera przez marginesy roota, które ignorują mousePress).
+  Min rozmiar obniżony do **820×520**; rozmiar startowy clamped do
+  `availableGeometry()` ekranu (`_initial_size`); **rozmiar zapamiętywany**
+  w `settings.window_size` (flush w `_flush_settings`, restore+clamp przy
+  starcie). Nowe testy: `test_window_resize.py` (15) — łącznie 363 passed.
+- **conftest `mock_connection` GC-fix** — `_MockSignals` QObject (bez parenta)
+  ginął z GC po wyjściu z fixture (bound-signal nie trzyma źródła) →
+  „Signal source has been deleted" przy `connect()`. Dodany keeper
+  (`conn._signals_keeper = signals`).
 
 **Sesja 7 (V8 / v1.3.2 — panel „Gry": przycisk Zapisz + WiX .msi fix):**
 - **Panel „Gry" przebudowany** (`ui/pages/config_pages.py`): „+ Dodaj" → **„💾 Zapisz"**.
