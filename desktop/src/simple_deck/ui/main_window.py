@@ -25,8 +25,8 @@ from PySide6.QtCore import Qt, QPoint, Signal
 from PySide6.QtGui import QColor, QMouseEvent
 from PySide6.QtWidgets import (QApplication, QFrame, QGraphicsDropShadowEffect,
                                 QHBoxLayout, QLabel, QMainWindow, QPushButton,
-                                QSizePolicy, QStackedWidget, QVBoxLayout,
-                                QWidget)
+                                QSizeGrip, QSizePolicy, QStackedWidget,
+                                QVBoxLayout, QWidget)
 
 from ..core.event_bus import EventBus
 from ..core.profile import Profile
@@ -130,6 +130,16 @@ class MainWindow(QMainWindow):
         self._stack.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         body.addWidget(self._stack, stretch=1)
         root_layout.addLayout(body, stretch=1)
+
+        # V1.3.4: Widoczny uchwyt resize w prawym dolnym rogu (kropki).
+        # QSizeGrip działa we frameless (sam woła startSystemResize) — daje
+        # oczywisty punkt zaczepienia, gdy krawędź umyka.
+        bottom = QHBoxLayout()
+        bottom.setContentsMargins(0, 0, 0, 0)
+        bottom.addStretch()
+        self._size_grip = QSizeGrip(root)
+        bottom.addWidget(self._size_grip, 0, Qt.AlignBottom | Qt.AlignRight)
+        root_layout.addLayout(bottom)
 
         # V6: Lazy page construction — Overview jest budowany od razu (to
         # domyślna strona i subskrybuje sygnały bus), pozostałe 4 strony są
@@ -412,7 +422,8 @@ class MainWindow(QMainWindow):
     # Resize (V1.3.3) — frameless okno nie ma natywnych uchwytów rozmiaru
     # ===================================================================
     # Strefa przy krawędzi okna traktowana jako uchwyt resize (px).
-    RESIZE_MARGIN = 8
+    # V1.3.4: 8 → 12 — węższa strefa była słabo chwytalna przy DPI 125-150%.
+    RESIZE_MARGIN = 12
 
     # Windows non-client hit-test codes (winuser.h)
     _HT = {

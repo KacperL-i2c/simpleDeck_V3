@@ -2,7 +2,7 @@
 
 > Handoff file for AI coding sessions. **Read this first.** It tells you what the
 > project is, what is already done, and what to work on next.
-> Last updated: 2026-08-24 (session 8 - V9 / v1.3.3: resize okna frameless).
+> Last updated: 2026-08-24 (session 9 - V10 / v1.3.4: Ustawienia na zakladkach + naprawa UX).
 
 ## 1. Project at a glance
 
@@ -109,6 +109,24 @@ Frame:  SOF(0xA5) | TYPE | CH | LEN | PAYLOAD[0..32] | CRC16-LO | CRC16-HI
     UpgradeCode) — mogą współistnieć bez konfliktu. `build.ps1` buduje oba.
 
 ## 6. DONE (v1.0 → V2)
+
+**Sesja 9 (V10 / v1.3.4 — Ustawienia na zakładkach + naprawa UX):**
+- **SettingsPage przebudowany na 5 zakładek** (`ui/pages/config_pages.py`):
+  Profile / **Gry** / Sterowanie / System / Info. Wcześniej 11 kart w jednym
+  QScrollArea (~2000+ px) — karta „Gry" (przycisk Zapisz) była 5. i przy DPI
+  125-150% lądowała poza ekranem. W karcie „Gry" wiersz input+Zapisz
+  przeniesiony NA GÓRĘ (nad listę). Każda zakładka = osobny krótki scroll
+  (`_tab_page()` helper).
+- **ToastHost click-through** (`ui/widgets/toast.py`) — host to osobne okno
+  Qt.Tool nakrywające prawy górny róg; z `WA_TransparentForMouseEvents=False`
+  niewidoczny pusty host zjadał kliknięcia i blokował resize krawędzi
+  („resize działa średnio"). Teraz host + Toast przepuszczają mysz.
+- **Scrollbar widoczny** (`assets/themes/glossy.qss`) — handle
+  `rgba(255,255,255,30)` → `110`, szerokość 10 → 12 px (poprzednio pasek
+  praktycznie niewidoczny na ciemnym tle). Nowe style QTabWidget/QTabBar/QSizeGrip.
+- **Resize affordance** (`ui/main_window.py`) — RESIZE_MARGIN 8 → 12 px +
+  **QSizeGrip** (widoczny uchwyt) w prawym dolnym rogu root layoutu.
+- Nowe testy: `test_settings_tabs.py` (9) — łącznie **372 passed, 1 skipped**.
 
 **Sesja 8 (V9 / v1.3.3 — resize okna frameless):**
 - **Okno da się zmniejszać** (`ui/main_window.py`): frameless okno nie miało

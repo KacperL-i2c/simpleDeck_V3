@@ -17,7 +17,7 @@ from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QFrame,
                                 QHBoxLayout, QLabel, QLineEdit,
                                 QProgressBar, QPushButton, QScrollArea, QSlider,
-                                QVBoxLayout, QWidget)
+                                QTabWidget, QVBoxLayout, QWidget)
 
 from ... import __version__
 from ...core.event_bus import EventBus
@@ -433,37 +433,43 @@ class SettingsPage(QWidget):
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
 
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.NoFrame)
-        outer.addWidget(scroll)
-
-        inner = QWidget()
-        scroll.setWidget(inner)
-
-        self._lay = QVBoxLayout(inner)
-        self._lay.setContentsMargins(0, 0, 0, 0)
-        self._lay.setSpacing(14)
-
         title = QLabel("USTAWIENIA", objectName="sectionTitle")
         title.setStyleSheet("font-size: 22px; font-weight: 700;")
-        self._lay.addWidget(title)
+        outer.addWidget(title)
 
-        # Karty
+        # V1.3.4: Zakładki zamiast jednego długiego scrolla. Wcześniej 11 kart
+        # w jednym QScrollArea (~2000+ px) — karta „Gry" była 5. i przy DPI
+        # 125-150% jej przycisk Zapisz lądował poza ekranem (niewidoczny
+        # scrollbar nie pomagał). Teraz każda zakładka to krótki scroll.
+        self._tabs = QTabWidget()
+        outer.addWidget(self._tabs, stretch=1)
+
+        # Profile (+ reguły auto-przełączania)
+        profile_cards = []
         if self._profile_mgr is not None:
-            self._lay.addWidget(self._card_profile())
-        self._lay.addWidget(self._card_filter_tuning())
-        self._lay.addWidget(self._card_pot_invert())
-        self._lay.addWidget(self._card_auto_switch())
-        self._lay.addWidget(self._card_game_apps())
-        self._lay.addWidget(self._card_appearance())
-        self._lay.addWidget(self._card_autostart())
-        self._lay.addWidget(self._card_tray())
-        self._lay.addWidget(self._card_audio_device())
-        self._lay.addWidget(self._card_about())
-        self._lay.addWidget(self._card_connection())
+            profile_cards.append(self._card_profile())
+        profile_cards.append(self._card_auto_switch())
+        self._tabs.addTab(self._tab_page(profile_cards), "Profile")
 
-        self._lay.addStretch()
+        # Gry — input + Zapisz zawsze widoczne na górze karty
+        self._tabs.addTab(self._tab_page([self._card_game_apps()]), "Gry")
+
+        # Sterowanie (filtr ADC + inwersja potów)
+        self._tabs.addTab(self._tab_page([self._card_filter_tuning(),
+                                          self._card_pot_invert()]),
+                          "Sterowanie")
+
+        # System (autostart + wygląd + tray + powiadomienia + urządzenie audio)
+        self._tabs.addTab(self._tab_page([self._card_autostart(),
+                                          self._card_appearance(),
+                                          self._card_tray(),
+                                          self._card_audio_device()]),
+                          "System")
+
+        # Info (o aplikacji + połączenie)
+        self._tabs.addTab(self._tab_page([self._card_about(),
+                                          self._card_connection()]),
+                          "Info")
 
         # V6: Debounced settings save — eliminuje 30-60 zapisów settings.json
         # na sekundę podczas przeciągania suwaków CFG/audio device/etc.
@@ -471,6 +477,22 @@ class SettingsPage(QWidget):
         self._save_timer.setSingleShot(True)
         self._save_timer.setInterval(500)  # 500 ms debounce
         self._save_timer.timeout.connect(self._flush_save)
+
+    def _tab_page(self, cards: list) -> QWidget:
+        """Zbuduj stronę zakładki: scroll area z kartami (każda osobno)."""
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+
+        inner = QWidget()
+        scroll.setWidget(inner)
+        lay = QVBoxLayout(inner)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(14)
+        for card in cards:
+            lay.addWidget(card)
+        lay.addStretch()
+        return scroll
 
     # ============================================================
     # Helper budujący kartę
@@ -693,12 +715,9 @@ class SettingsPage(QWidget):
             "i kliknij Zapisz. Potencjometr z akcją „Gra (auto)„ automatycznie "
             "wykryje która gra jest aktywna i steruje jej głośnością.",
             objectName="sectionSubtitle"))
-        self._games_widget = QWidget()
-        self._games_lay = QVBoxLayout(self._games_widget)
-        self._games_lay.setContentsMargins(0, 0, 0, 0)
-        self._games_lay.setSpacing(6)
-        cl.addWidget(self._games_widget)
 
+        # V1.3.4: Wiersz input+Zapisz NA GÓRZE karty (nad listą) — przycisk
+        # widoczny natychmiast po wejściu w zakładkę, bez scrollowania.
         add_row = QHBoxLayout()
         self._game_input = QLineEdit()
         self._game_input.setPlaceholderText("np. cs2.exe, witcher3.exe")
@@ -709,6 +728,12 @@ class SettingsPage(QWidget):
         add_row.addWidget(self._game_input, stretch=1)
         add_row.addWidget(game_save_btn)
         cl.addLayout(add_row)
+
+        self._games_widget = QWidget()
+        self._games_lay = QVBoxLayout(self._games_widget)
+        self._games_lay.setContentsMargins(0, 0, 0, 0)
+        self._games_lay.setSpacing(6)
+        cl.addWidget(self._games_widget)
 
         self._reload_games()
         return card

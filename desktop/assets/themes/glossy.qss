@@ -269,22 +269,56 @@ QScrollArea {
 QScrollArea > QWidget > QWidget {
     background: transparent;
 }
+/* V1.3.4: handle alpha 30 → 110 i szerokość 10 → 12 — poprzednio pasek był
+   praktycznie niewidoczny na ciemnym tle (user nie wiedział że jest scroll). */
 QScrollBar:vertical {
     background: transparent;
-    width: 10px;
+    width: 12px;
     margin: 6px 2px;
 }
 QScrollBar::handle:vertical {
-    background: rgba(255, 255, 255, 30);
+    background: rgba(255, 255, 255, 110);
     border-radius: 4px;
     min-height: 30px;
 }
 QScrollBar::handle:vertical:hover {
-    background: rgba(45, 212, 255, 100);
+    background: rgba(255, 255, 255, 170);
 }
 QScrollBar::add-line:vertical,
 QScrollBar::sub-line:vertical { height: 0; }
 QScrollBar:horizontal { height: 0; }
+/* V1.3.4: widoczny uchwyt resize okna (prawy dolny róg) */
+QSizeGrip {
+    background: transparent;
+}
+
+/* ============================ TABWIDGET =================================== */
+/* V1.3.4: Ustawienia na zakładkach — styl spójny z glassmorphism. */
+QTabWidget::pane {
+    border: 1px solid #2A2D3A;
+    border-radius: 12px;
+    background: rgba(28, 30, 42, 120);
+}
+QTabBar::tab {
+    background: rgba(28, 30, 42, 140);
+    color: #A5ABC0;
+    padding: 8px 18px;
+    margin-right: 4px;
+    border: 1px solid #2A2D3A;
+    border-bottom: none;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    font-size: 13px;
+}
+QTabBar::tab:hover {
+    color: #F5F7FA;
+    background: rgba(42, 45, 58, 200);
+}
+QTabBar::tab:selected {
+    color: #F5F7FA;
+    background: rgba(28, 30, 42, 220);
+    border-bottom: 2px solid #2DD4FF;
+}
 
 /* ============================ COMBOBOX ==================================== */
 QComboBox {

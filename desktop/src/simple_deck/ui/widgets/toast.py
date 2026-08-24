@@ -32,6 +32,9 @@ class Toast(QFrame):
                  duration_ms: int = DEFAULT_DURATION_MS, parent=None):
         super().__init__(parent)
         self.setObjectName("toast")
+        # V1.3.4: Click-through — dziecko nie może łapać myszy skoro host
+        # przepuszcza zdarzenia (spójność atrybutu na obu poziomach).
+        self.setAttribute(Qt.WA_TransparentForMouseEvents, True)
         accent, bg = LEVELS.get(level, LEVELS["info"])
         self.setFixedWidth(320)
         self.setStyleSheet(
@@ -83,7 +86,12 @@ class ToastHost(QWidget):
         super().__init__(parent)
         self._window = window
         self._settings = settings
-        self.setAttribute(Qt.WA_TransparentForMouseEvents, False)
+        # V1.3.4: Click-through — ToastHost to osobne okno Qt.Tool nakrywające
+        # prawy górny róg okna głównego. Z WA_TransparentForMouseEvents=False
+        # (poprzednio) niewidoczny pusty host zjadał kliknięcia i blokował
+        # resize krawędzi w swoim obszarze ("resize działa średnio"). Toasty
+        # są czysto informacyjne — nie potrzebują myszy.
+        self.setAttribute(Qt.WA_TransparentForMouseEvents, True)
         self.setAttribute(Qt.WA_TranslucentBackground, True)
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.Tool | Qt.WindowStaysOnTopHint)
 
