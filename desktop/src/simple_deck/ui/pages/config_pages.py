@@ -8,6 +8,7 @@ do dysku przez ``ProfileManager.save()`` (co 500ms po ostatniej zmianie).
 from __future__ import annotations
 
 import logging
+import re
 import sys
 from pathlib import Path
 from typing import Optional
@@ -688,8 +689,9 @@ class SettingsPage(QWidget):
         """Lista procesów oznaczonych jako gry (dla PotAction.GAME_VOLUME)."""
         card, cl = self._card("Gry", "gamepad")
         cl.addWidget(QLabel(
-            "Dodaj nazwy procesów gier. Potencjometr z akcją „Gra (auto)„ "
-            "automatycznie wykryje która gra jest aktywna i steruje jej głośnością.",
+            "Wpisz nazwy procesów gier (można wiele, rozdzielone przecinkiem) "
+            "i kliknij Zapisz. Potencjometr z akcją „Gra (auto)„ automatycznie "
+            "wykryje która gra jest aktywna i steruje jej głośnością.",
             objectName="sectionSubtitle"))
         self._games_widget = QWidget()
         self._games_lay = QVBoxLayout(self._games_widget)
@@ -700,12 +702,12 @@ class SettingsPage(QWidget):
         add_row = QHBoxLayout()
         self._game_input = QLineEdit()
         self._game_input.setPlaceholderText("np. cs2.exe, witcher3.exe")
-        game_add_btn = QPushButton("+ Dodaj")
-        game_add_btn.setCursor(Qt.PointingHandCursor)
-        game_add_btn.clicked.connect(self._add_game)
-        self._game_input.returnPressed.connect(self._add_game)
+        game_save_btn = QPushButton("💾  Zapisz")
+        game_save_btn.setCursor(Qt.PointingHandCursor)
+        game_save_btn.clicked.connect(self._save_games)
+        self._game_input.returnPressed.connect(self._save_games)
         add_row.addWidget(self._game_input, stretch=1)
-        add_row.addWidget(game_add_btn)
+        add_row.addWidget(game_save_btn)
         cl.addLayout(add_row)
 
         self._reload_games()
@@ -731,23 +733,51 @@ class SettingsPage(QWidget):
             container.setLayout(row)
             self._games_lay.addWidget(container)
 
-    def _add_game(self) -> None:
-        name = self._game_input.text().strip().lower()
-        if not name:
+    @staticmethod
+    def _parse_game_names(raw: str) -> list[str]:
+        """Sparsuj input użytkownika na listę nazw procesów.
+
+        Akceptuje wiele nazw rozdzielonych przecinkiem, średnikiem lub białymi
+        znakami. Trim + lowercase + deduplikacja (zachowując kolejność wpisania).
+        """
+        tokens = re.split(r"[,;\s]+", (raw or "").strip())
+        seen: list[str] = []
+        for t in tokens:
+            name = t.strip().lower()
+            if name and name not in seen:
+                seen.append(name)
+        return seen
+
+    def _save_games(self) -> None:
+        """Zapisz nazwy procesów z pola wejściowego do settings (natychmiast, bez debounce).
+
+        V1.3.2: Zastąpił natychmiastowe „+ Dodaj". Natychmiastowy flush na dysk
+        (bez 500 ms debouncera) eliminuje utratę wpisu przy szybkim zamknięciu
+        aplikacji po zapisie.
+        """
+        names = self._parse_game_names(self._game_input.text())
+        if not names:
+            self._notify("info", "Nic do zapisania — wpisz nazwę procesu gry.")
             return
-        if name not in self._settings.game_apps:
-            self._settings.game_apps.append(name)
-            self._save_settings()
+        added = []
+        for name in names:
+            if name not in self._settings.game_apps:
+                self._settings.game_apps.append(name)
+                added.append(name)
         self._game_input.clear()
         self._reload_games()
-        self._notify("success", f"Dodano grę: {name}")
+        if added:
+            self._flush_save()
+            self._notify("success", f"Zapisano: {', '.join(added)}")
+        else:
+            self._notify("info", "Wszystkie wpisane gry są już na liście.")
 
     def _remove_game(self, name: str) -> None:
         try:
             self._settings.game_apps.remove(name)
         except ValueError:
             pass
-        self._save_settings()
+        self._flush_save()
         self._reload_games()
 
     def _card_appearance(self) -> QFrame:

@@ -105,8 +105,17 @@ def mock_connection(qapp):
 # ============================================================================
 @pytest.fixture
 def tmp_home(tmp_path, monkeypatch):
-    """Tymczasowy HOME by nie nadpisać prawdziwych profilów usera."""
+    """Tymczasowy HOME by nie nadpisać prawdziwych profilów usera.
+
+    Na Windows ``Path.home()`` (ntpath.expanduser) czyta ``USERPROFILE`` —
+    samo ``HOME`` nie wystarcza i testy profili lekkomyślnie tworzyły
+    pliki w prawdziwym ``~/.config/simple-deck/`` (kolizje między runami
+    → fałszywe FAIL-e). Ustawiamy oba + HOMEDRIVE/HOMEPATH dla pewności.
+    """
     monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
+    monkeypatch.setenv("HOMEDRIVE", str(tmp_path.anchor))
+    monkeypatch.setenv("HOMEPATH", str(tmp_path).replace(tmp_path.anchor, ""))
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / ".local" / "share"))
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / ".config"))
     return tmp_path
